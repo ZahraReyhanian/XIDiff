@@ -31,29 +31,17 @@ def gather(consts: torch.Tensor, t: torch.Tensor):
     c = consts.gather(-1, t)
     return c.reshape(-1, 1, 1, 1)
 
-"""## 2.1 Dataset
+# 2.1 Dataset
 
-We'll start with a classic small dataset, with 32px square images from 10 classes. For convenience we just pull a version that is avalable on the huggingface hub.
-"""
-
-# @title alternative dataset: faces (CelebA) - uncomment to run
-faces = load_dataset('nielsr/CelebA-faces', split="train[:100%]")
-
-from PIL import Image
 im_size = 48
+transform = transforms.Compose([transforms.Resize((im_size, im_size)),
+                                 transforms.ToTensor()])
 
-def resize_image(example):
-    example['image'] = example['image'].resize((im_size, im_size))  # Resize to 48*48
-    return example
+# load dataset
+train = datasets.ImageFolder('data/train', transform=transform)
+valid = datasets.ImageFolder('data/valid', transform=transform)
+test = datasets.ImageFolder('data/test', transform=transform)
 
-faces = faces.map(resize_image, batched=False)
-
-# View some examples:
-image = Image.new('RGB', size=(im_size*4, im_size*2))
-for i in range(10):
-  im = faces[i]['image']
-  image.paste(im, ( (i%4)*im_size, (i//4)*im_size ))
-image.resize((im_size*4*4, im_size*2*4), Image.NEAREST)
 
 ## 2.2 Adding Noise
 
@@ -62,29 +50,10 @@ n_steps = 100
 beta = torch.linspace(0.0001, 0.04, n_steps)
 
 def q_xt_xtminus1(xtm1, t):
-  ################################################################################
-    # TODO: complete the code here
-    # Complete this function using the equation above to generate noise
     beta_t = gather(beta, t)
     mean = (1. - beta_t).sqrt() * xtm1
     std = beta_t.sqrt()
     return mean + std * torch.randn(*xtm1.shape)
-    # End
-    ################################################################################
-
-# Show im at different stages
-ims = []
-start_im = faces[20]['image']
-x = img_to_tensor(start_im).squeeze()
-for t in range(n_steps):
-
-  # Store images every 20 steps to show progression
-  if t%20 == 0:
-    ims.append(tensor_to_image(x))
-
-  # Calculate Xt given Xt-1 (i.e. x from the previous iteration)
-  t = torch.tensor(t, dtype=torch.long) # t as a tensor
-  x = q_xt_xtminus1(x, t) # Modify x using our function above
 
 
 n_steps = 100
@@ -93,16 +62,10 @@ alpha = 1. - beta
 alpha_bar = torch.cumprod(alpha, dim=0)
 
 def q_xt_x0(x0, t):
-  ################################################################################
-    # TODO: complete the code here
-    # Complete this function using the equation above to generate the appropriate noise
-
     alpha_bar_t = gather(alpha_bar, t)
     mean = (alpha_bar_t).sqrt()*x0
     std = (1- alpha_bar_t).sqrt()
     return mean + std * torch.randn(*x0.shape)
-    # End
-    ################################################################################
 
 ## 2.3 UNETs
 
@@ -483,38 +446,17 @@ class UNet(nn.Module):
         # Final normalization and convolution
         return self.final(self.act(self.norm(x)))
 
-# Let's see it in action on dummy data:
 
-# A dummy batch of 10 3-channel im_size px images
-x = torch.randn(10, 3, im_size, im_size)
+# 2.4 Training
 
-# 't' - what timestep are we on
-t = torch.tensor([50.], dtype=torch.long)
-
-# Define the unet model
-unet = UNet()
-
-# The foreward pass (takes both x and t)
-model_output = unet(x, t)
-
-# The output shape matches the input.
-model_output.shape
-
-"""## 2.4 Training Time
-
-Now that we have our 'diffusion model' defined, we need to train it to predict the noise given $x_t$ and $t$.
-
-Why not predict the denoised image directly? Mostly just due to convenience - the noise is nicely scaled with a mean of zero, and this well-suited to being modeled with a neural network. You don't **have** to do it this way, but the papers do, and we can make it easy by tweaking our `q_xt_x0` function to return both the noised image ($x_t$) and the noise itself, which will be the 'target' our network tries to produce.
-
-This training loop should look familiar from all the past lessons!
-"""
-
-#data loader for train and test
+#data loader for train and valid
 batch_size = 16 # Lower this if hitting memory issues
-train_data = [(img_to_tensor(x['image'])) for x in faces]
-train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size)
 
-len(train_loader)
+train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True)
+valid_loader = torch.utils.data.DataLoader(valid, batch_size=batch_size, shuffle=True)
+
+print("size of train data:", len(train_loader))
+print("size of valid data:", len(valid_loader))
 
 # path to save model
 PATH = './model_ddpm.pt'
@@ -523,19 +465,15 @@ torch.cuda.empty_cache()
 # Set up some parameters
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu");
+print("device: ", device)
 
 n_steps = 1000
 beta = torch.linspace(0.0001, 0.04, n_steps, device=device)
 alpha = 1. - beta
 alpha_bar = torch.cumprod(alpha, dim=0)
 
-# Modified to return the noise itself as well
+# return the noise itself as well
 def q_xt_x0(x0, t):
-################################################################################
-    # TODO: complete the code here
-    # Write the equation that you have witen in the previous section here again
-    # This time write it based on what you want from it in the training process
-
     alpha_bar_t = gather(alpha_bar, t)
     mean = (alpha_bar_t).sqrt()*x0
 
@@ -546,7 +484,6 @@ def q_xt_x0(x0, t):
 
     return x_t, noise
 
-    # End
 ################################################################################
 # Create the model
 unet = UNet(n_channels=32).cuda()
@@ -554,27 +491,16 @@ unet = UNet(n_channels=32).cuda()
 # Training params
 lr = 1e-4 # Explore this - might want it lower when training on the full dataset
 
-losses = [] # Store losses for later plotting
-
-################################################################################
-    # TODO: complete the code here
-    # Define the relevant Optimizer to train your model
 epochs = 60
 optimizer = torch.optim.AdamW(unet.parameters(), lr=lr) # Optimizer
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5) #learning rate scheduler
 denoising_loss = F.mse_loss #use mean squared error fuction to calculate loss
 
-n = len(faces)
-    # End
-################################################################################
-
+n = len(train)
 
 
 # Training Loop
-
-################################################################################
-    # TODO: complete the code here
-    # Write the main and forward training loop here
+losses = [] # Store losses for later plotting
 val_losses = []
 
 for epoch in range(epochs):
@@ -589,7 +515,7 @@ for epoch in range(epochs):
     progress_bar.set_description(f"Epoch {epoch+1}")
     prev_loss = 1000000
 
-    for idx, x in enumerate(train_loader):
+    for idx, (x, y) in enumerate(train_loader):
         b_size = x.shape[0]
         x = x.reshape(b_size,3,im_size,im_size).to(device=device)
         optimizer.zero_grad()
@@ -621,27 +547,27 @@ for epoch in range(epochs):
     if train_loss / it < prev_loss:
         torch.save(unet.state_dict(), PATH)
     prev_loss = train_loss / it
+    progress_bar.close()
 
+    # validation step
+    unet.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for idx, (xv, yv) in enumerate(valid_loader):
+            b_size = xv.shape[0]
+            xv, yv = xv.reshape(b_size,3,im_size,im_size).to(device=device), yv.to(device=device)
 
-    # # validation step
-    # unet.eval()
-    # val_loss = 0
-    # with torch.no_grad():
-    #     for idx, (xv, yv) in enumerate(test_loader):
-    #         b_size = xv.shape[0]
-    #         xv, yv = xv.reshape(b_size,3,32,32).to(device=device), yv.to(device=device)
+            t = torch.randint(0, n_steps, (b_size,), dtype=torch.long).to(device=device)
+            x_t, noise = q_xt_x0(xv, t)
 
-    #         t = torch.randint(0, n_steps, (b_size,), dtype=torch.long).to(device=device)
-    #         x_t, noise = q_xt_x0(xv, t)
+            pred_noise = unet(x_t.float(), t)
 
-    #         pred_noise = unet(x_t.float(), t)
+            # calculate validation loss
+            loss = denoising_loss(noise.reshape(b_size,3,im_size*im_size), pred_noise.reshape(b_size,3,im_size*im_size))
+            val_loss += loss.item()
 
-    #         # calculate validation loss
-    #         loss = denoising_loss(noise.reshape(b_size,3,32*32), pred_noise.reshape(b_size,3,32*32))
-    #         val_loss += loss.item()
-
-    #     val_losses.append(val_loss/len(test_loader))
-    #     print(f"Epoch {epoch+1}: Validation Loss: {val_loss/len(test_loader)} ")
+        val_losses.append(val_loss/len(valid_loader))
+        print(f"Epoch {epoch+1}: Validation Loss: {val_loss/len(valid_loader)} ")
 
 
     # End
@@ -654,11 +580,11 @@ for epoch in range(epochs):
 import matplotlib.pyplot as plt
 
 plt.plot(range(epochs), losses, label="Train loss")
-#plt.plot(range(epochs), val_losses, label="Validation loss")
+plt.plot(range(epochs), val_losses, label="Validation loss")
 plt.ylabel("loss/error")
 plt.xlabel('Epochs')
-plt.title("Train  loss during training")
-#plt.legend()
+plt.title("Train and valid loss during training")
+plt.legend()
 plt.show()
 plt.savefig('training.png')
 
@@ -724,7 +650,7 @@ for i in range(n_steps):
         x = p_xt(x, pred_noise, t.unsqueeze(0))
 
         progress_bar.update(1)
-        # TODO: save the generated sample (x) in a directory
+        # save the generated sample (x) in a directory
         # See this link: https://pytorch.org/vision/stable/generated/torchvision.utils.save_image.html
         # Be sure to assign a different name to each image!
     # fake_images_tensor.append()
