@@ -459,7 +459,7 @@ print("size of train data:", len(train_loader))
 print("size of valid data:", len(valid_loader))
 
 # path to save model
-PATH = './model_ddpm.pt'
+PATH = './model_ddpm.pth'
 
 torch.cuda.empty_cache()
 # Set up some parameters
@@ -486,14 +486,16 @@ def q_xt_x0(x0, t):
 
 ################################################################################
 # Create the model
-unet = UNet(n_channels=32).cuda()
-
+n_channels = 32
+unet = UNet(n_channels=n_channels).cuda()
+# unet = UNet(n_channels=n_channels).cuda()
+# unet.load_state_dict(torch.load(PATH))
 # Training params
 lr = 1e-4 # Explore this - might want it lower when training on the full dataset
 
-epochs = 60
+epochs = 100
 optimizer = torch.optim.AdamW(unet.parameters(), lr=lr) # Optimizer
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.5) #learning rate scheduler
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8) #learning rate scheduler
 denoising_loss = F.mse_loss #use mean squared error fuction to calculate loss
 
 n = len(train)
@@ -536,18 +538,18 @@ for epoch in range(epochs):
         #optimize parameters
         optimizer.step()
 
-        progress_bar.set_postfix({"loss": train_loss / (idx + 1)})
+        progress_bar.set_postfix({"loss": train_loss / (idx + 1), "lr": scheduler.get_last_lr()})
         progress_bar.update(1)
 
     scheduler.step()
-    print(scheduler.get_last_lr())
     losses.append(train_loss/it)
+    progress_bar.close()
+
     print(f"Epoch {epoch+1}: Train Loss: {train_loss/it} ")
 
     if train_loss / it < prev_loss:
         torch.save(unet.state_dict(), PATH)
     prev_loss = train_loss / it
-    progress_bar.close()
 
     # validation step
     unet.eval()
@@ -591,7 +593,7 @@ plt.savefig('training.png')
 
 """### save model"""
 
-torch.save(unet.state_dict(), './final_model.pt')
+torch.save(unet.state_dict(), './final_model.pth')
 
 """## 2.5 The Reverse Step
 
