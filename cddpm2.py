@@ -411,15 +411,17 @@ class UNet(nn.Module):
         self.act = Swish()
         self.final = nn.Conv2d(in_channels, image_channels, kernel_size=(3, 3), padding=(1, 1))
 
+
     def forward(self, x: torch.Tensor, t: torch.Tensor):
+        # Get time-step embeddings
+        t = self.time_emb(t)
+        return self.unet_forwad(x, t)
+
+    def unet_forwad(self, x: torch.Tensor, t: torch.Tensor):
         """
         * `x` has shape `[batch_size, in_channels, height, width]`
         * `t` has shape `[batch_size]`
         """
-
-        # Get time-step embeddings
-        t = self.time_emb(t)
-
         # Get image projection
         x = self.image_proj(x)
 
@@ -445,6 +447,23 @@ class UNet(nn.Module):
 
         # Final normalization and convolution
         return self.final(self.act(self.norm(x)))
+
+class UNet_conditional(UNet):
+    def __init__(self, image_channels=3, n_channels=3, time_dim=256, num_classes=None):
+        super().__init__(image_channels, n_channels)
+        if num_classes is not None:
+            self.label_emb = nn.Embedding(num_classes, time_dim)
+
+
+    def forward(self, x, t, y=None):
+        t = self.time_emb(t)
+
+
+        if y is not None:
+            t += self.label_emb(y)
+
+
+        return self.unet_forwad(x, t)
 
 
 # 2.4 Training
@@ -504,6 +523,7 @@ n = len(train)
 # Training Loop
 losses = [] # Store losses for later plotting
 val_losses = []
+prev_loss = 1000000
 
 for epoch in range(epochs):
     #train step
@@ -515,7 +535,6 @@ for epoch in range(epochs):
 
     progress_bar = tqdm(it, total=it)
     progress_bar.set_description(f"Epoch {epoch+1}")
-    prev_loss = 1000000
 
     for idx, (x, y) in enumerate(train_loader):
         b_size = x.shape[0]
