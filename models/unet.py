@@ -609,6 +609,8 @@ class UNetModel(nn.Module):
         input_block_chans = [ch]
         ds = 1
         skip_downsample_level = 4
+        cross_attn_encoder_channels = None
+
         for level, mult in enumerate(channel_mult):
             for _ in range(num_res_blocks):
                 layers = [

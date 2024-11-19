@@ -29,7 +29,7 @@ class Trainer(pl.LightningModule):
 
         self.model = model_helper.make_unet(unet_config)
         self.ema_model = EMAModel(self.model, inv_gamma=1.0, power=3 / 4, max_value=0.9999)
-        if 'gradient_checkpointing' in unet_config['params'] and unet_config['params']['gradient_checkpointing']:
+        if 'gradient_checkpointing' in unet_config and unet_config['gradient_checkpointing']:
             self.model.enable_gradient_checkpointing()
 
         self.valid_loss_metric = torchmetrics.MeanMetric()

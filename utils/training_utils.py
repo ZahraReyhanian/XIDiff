@@ -56,11 +56,14 @@ def gather(consts: torch.Tensor, t: torch.Tensor):
     c = consts.gather(-1, t)
     return c.reshape(-1, 1, 1, 1)
 
+torch.cuda.empty_cache()
+# Set up some parameters
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
 n_steps = 1000
 beta = torch.linspace(0.0001, 0.04, n_steps, device=device)
 alpha = 1. - beta
 alpha_bar = torch.cumprod(alpha, dim=0)
-device = torch.device("cuda" if use_cuda else "cpu");
 
 
 # return the noise itself as well

@@ -1,5 +1,5 @@
 import torch
-from src.models.unet import UNetModel
+from models.unet import UNetModel
 
 def create_model(
         image_size,
@@ -64,10 +64,9 @@ def create_model(
 
 
 def make_unet(unet_config):
-    assert unet_config.params['condition_type'] in [None, 'cross_attn', 'crossatt_and_stylemod']
     model: UNetModel = create_model(**unet_config)
-    if unet_config.params.pretrained_model_path:
-        print('loading model from {}'.format(unet_config.params.pretrained_model_path))
-        statedict = torch.load(unet_config.params.pretrained_model_path, map_location='cpu')
+    if unet_config.get("pretrained_model_path"):
+        print('loading model from {}'.format(unet_config["pretrained_model_path"]))
+        statedict = torch.load(unet_config["pretrained_model_path"], map_location='cpu')
         res = model.load_state_dict(statedict, strict=True)
     return model

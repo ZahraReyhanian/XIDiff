@@ -29,7 +29,7 @@ from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
 
 unet_config = {
-    "image_size": (48, 48),
+    "image_size": 112,
     "num_channels": 128,
     "num_res_blocks": 1,
     "channel_mult": '',
@@ -62,23 +62,22 @@ def train(cfg):
     """
 
     # set seed for random number generators in pytorch, numpy and python.random
-    pl.seed_everything(cfg.seed, workers=True)
+    pl.seed_everything(cfg["seed"], workers=True)
 
-    datamodule = FaceDataModule(dataset_path=cfg.dataset_path)
+    datamodule = FaceDataModule(dataset_path=cfg["dataset_path"])
 
     model = MyModelTrainer(datamodule=datamodule,
                            unet_config=unet_config,
-                           output_dir=cfg.output_dir,
-                           ckpt_path=cfg.ckpt_path,
-                           mse_loss_lambda=cfg.mse_loss_lambda,
-                           identity_consistency_loss_lambda=cfg.identity_consistency_loss_lambda)
+                           output_dir=cfg["output_dir"],
+                           mse_loss_lambda=cfg["mse_loss_lambda"],
+                           identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"])
 
     print("Instantiating callbacks...")
-    callbacks = create_list_of_callbacks(cfg.ckpt_path)
+    callbacks = create_list_of_callbacks(cfg["ckpt_path"])
 
     print("Instantiating loggers...")
     id = ""
-    logger = WandbLogger(project=cfg.project_task, log_model='all', id= id, save_dir=cfg.output_dir,)
+    logger = WandbLogger(project=cfg["project_task"], log_model='all', id= id, save_dir=cfg["output_dir"],)
 
     strategy = DDPStrategy(find_unused_parameters=False)
     trainer = Trainer(callbacks=callbacks, logger=logger, strategy=strategy)
@@ -96,11 +95,11 @@ def train(cfg):
         print("Logging hyperparameters!")
         log_hyperparameters(object_dict)
 
-    if cfg.get("train"):
+    if cfg["train"]:
         print("Starting training!")
-        if cfg.get("ckpt_path"):
-            print('continuing from ', cfg.get("ckpt_path"))
-        trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
+        if cfg["ckpt_path"]:
+            print('continuing from ', cfg["ckpt_path"])
+        trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg["ckpt_path"])
 
     train_metrics = trainer.callback_metrics
 
@@ -132,26 +131,24 @@ def train(cfg):
 
 
 def main():
-    with open('data.json') as f:
+    with open('config/config.json') as f:
         cfg = json.load(f)
 
-    print(f"tmp directory : {cfg.output_dir}")
+    print(f"tmp directory : {cfg['output_dir']}")
     #TODO: if exits remove
     # if 'experiments' in cfg.output_dir:
     #     print(f"removing tmp directory : {cfg.output_dir}")
     #     shutil.rmtree(cfg.paths.output_dir, ignore_errors=True)
-    run_name = os_utils.make_runname(cfg.prefix)
-    task = os.path.basename(cfg.project_task)
-    exp_root = os.path.dirname(cfg.output_dir)
+    run_name = os_utils.make_runname(cfg["prefix"])
+    task = os.path.basename(cfg["project_task"])
+    exp_root = os.path.dirname(cfg["output_dir"])
     output_dir = os_utils.make_output_dir(exp_root, task, run_name)
     os.makedirs(output_dir, exist_ok=True)
-    cfg.output_dir = output_dir
-    cfg.log_dir = output_dir
 
-    wandb_name = os.path.basename(cfg.output_dir)
+    wandb_name = os.path.basename(cfg["output_dir"])
 
     print(f"Current working directory : {os.getcwd()}")
-    print(f"Saving Directory          : {cfg.output_dir}")
+    print(f"Saving Directory          : {cfg['output_dir']}")
     available_gpus = torch.cuda.device_count()
     print("available_gpus------------", available_gpus)
     # cfg.datamodule.batch_size = int(cfg.datamodule.total_gpu_batch_size / available_gpus)
