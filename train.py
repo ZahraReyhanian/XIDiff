@@ -76,8 +76,7 @@ def train(cfg):
     callbacks = create_list_of_callbacks(cfg["ckpt_path"])
 
     print("Instantiating loggers...")
-    id = ""
-    logger = WandbLogger(project=cfg["project_task"], log_model='all', id= id, save_dir=cfg["output_dir"],)
+    logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
 
     strategy = DDPStrategy(find_unused_parameters=False)
     trainer = Trainer(callbacks=callbacks, logger=logger, strategy=strategy)
