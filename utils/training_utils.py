@@ -6,8 +6,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from functools import partial
-
 from pytorch_lightning.utilities import rank_zero_only
+
+torch.cuda.empty_cache()
+# Set up some parameters
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
+
 
 @rank_zero_only
 def log_hyperparameters(object_dict: dict) -> None:
@@ -53,13 +58,10 @@ def log_hyperparameters(object_dict: dict) -> None:
 
 def gather(consts: torch.Tensor, t: torch.Tensor):
     """Gather consts for $t$ and reshape to feature map shape"""
-    c = consts.gather(-1, t)
+    c = consts.gather(-1, t.to(device))
     return c.reshape(-1, 1, 1, 1)
 
-torch.cuda.empty_cache()
-# Set up some parameters
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
+
 n_steps = 1000
 beta = torch.linspace(0.0001, 0.04, n_steps, device=device)
 alpha = 1. - beta
@@ -68,8 +70,8 @@ alpha_bar = torch.cumprod(alpha, dim=0)
 
 # return the noise itself as well
 def q_xt_x0(x0, t):
-    alpha_bar_t = gather(alpha_bar, t)
-    mean = (alpha_bar_t).sqrt()*x0
+    alpha_bar_t = gather(alpha_bar, t.to(device))
+    mean = (alpha_bar_t).sqrt()*x0.to(device)
 
     std = (1-alpha_bar_t).sqrt()
     noise = torch.randn_like(x0).to(device)

@@ -2,6 +2,7 @@ from typing import Optional
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from keras.utils import image_dataset_from_directory
+from torchvision import datasets, transforms
 
 class FaceDataModule(LightningDataModule):
 
@@ -30,35 +31,14 @@ class FaceDataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            self.data_train = image_dataset_from_directory(self.dataset_path+'/train',
-                                                           labels="inferred",
-                                                           label_mode="categorical",
-                                                           color_mode="rgb",
-                                                           image_size=self.img_size,
-                                                           seed=self.seed,
-                                                           batch_size=self.batch_size,
-                                                           shuffle=True
-                                                        )
-            self.data_val = image_dataset_from_directory(self.dataset_path+'/valid',
-                                                         labels="inferred",
-                                                         label_mode="categorical",
-                                                         color_mode="rgb",
-                                                         image_size=self.img_size,
-                                                         seed=self.seed,
-                                                         batch_size=self.batch_size,
-                                                         shuffle=False)
-            self.data_test = image_dataset_from_directory(self.dataset_path+'/test',
-                                                          labels="inferred",
-                                                          label_mode="categorical",
-                                                          color_mode="rgb",
-                                                          image_size=self.img_size,
-                                                          seed=self.seed,
-                                                          batch_size=self.batch_size,
-                                                          shuffle=False)
-            print('train data:', len(self.data_train))
-            print('val data:', len(self.data_val))
-            print('test_data:', len(self.data_test))
+            im_size = 48
+            transform = transforms.Compose([transforms.Resize(self.img_size),
+                                            transforms.ToTensor()])
 
+            # load dataset
+            self.data_train = datasets.ImageFolder('data/train', transform=transform)
+            self.data_val = datasets.ImageFolder('data/valid', transform=transform)
+            self.data_test = datasets.ImageFolder('data/test', transform=transform)
 
     def train_dataloader(self):
         return DataLoader(

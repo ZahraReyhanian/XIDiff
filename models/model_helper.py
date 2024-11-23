@@ -50,7 +50,7 @@ def create_model(
         attention_resolutions=tuple(attention_ds),
         dropout=dropout,
         channel_mult=channel_mult,
-        num_classes=(1000 if class_cond else None),
+        num_classes=(7 if class_cond else None),
         use_checkpoint=use_checkpoint,
         use_fp16=use_fp16,
         num_heads=num_heads,

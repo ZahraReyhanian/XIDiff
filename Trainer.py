@@ -1,4 +1,3 @@
-import torch
 from pytorch_lightning.utilities.distributed import rank_zero_only
 import os
 from typing import Any, List
@@ -10,6 +9,7 @@ from models import model_helper
 import torchmetrics
 from utils.training_utils import EMAModel
 from utils.training_utils import q_xt_x0
+from losses.consistency_loss import calc_identity_consistency_loss
 import torch
 
 class Trainer(pl.LightningModule):
@@ -70,6 +70,7 @@ class Trainer(pl.LightningModule):
         if self.current_epoch == 0:
             # one time copy of project files
             os.makedirs(self.output_dir, exist_ok=True)
+            print("training stats....................")
 
     @rank_zero_only
     @torch.no_grad()
@@ -77,7 +78,7 @@ class Trainer(pl.LightningModule):
         pass
 
     def shared_step(self, batch, stage='train', optimizer_idx=0, n_steps=1000, *args, **kwargs):
-        clean_images = batch['image']
+        clean_images = batch[0]
 
         bsz = clean_images.shape[0]
 
@@ -140,10 +141,11 @@ class Trainer(pl.LightningModule):
         if self.ema_model.averaged_model.device != self.device:
             self.ema_model.averaged_model.to(self.device)
         self.ema_model.step(self.model)
-        self.log("ema_decay", self.ema_model.decay, prog_bar=True, logger=True, on_step=True, on_epoch=False)
-
-        # self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-        self.log_dict(loss_dict, prog_bar=True)
+        # self.log("ema_decay", self.ema_model.decay, prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        #
+        # # self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+        # self.log_dict(loss_dict, prog_bar=True)
+        print("Training finishhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")
 
         return loss
 

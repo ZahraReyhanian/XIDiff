@@ -76,29 +76,29 @@ def train(cfg):
     callbacks = create_list_of_callbacks(cfg["ckpt_path"])
 
     print("Instantiating loggers...")
-    logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
-
+    # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
+    print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = Trainer(callbacks=callbacks, logger=logger, strategy=strategy)
+    trainer = Trainer(callbacks=callbacks, strategy=strategy)
 
     object_dict = {
         "cfg": cfg,
         "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
-        "logger": logger,
+        # "logger": logger,
         "trainer": trainer,
     }
 
-    if logger:
-        print("Logging hyperparameters!")
-        log_hyperparameters(object_dict)
+    # if logger:
+    #     print("Logging hyperparameters!")
+    #     log_hyperparameters(object_dict)
 
     if cfg["train"]:
-        print("Starting training!")
+        print("Starting training...")
         if cfg["ckpt_path"]:
             print('continuing from ', cfg["ckpt_path"])
-        trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg["ckpt_path"])
+        trainer.fit(model=model, datamodule=datamodule)
 
     train_metrics = trainer.callback_metrics
 
