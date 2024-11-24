@@ -36,7 +36,7 @@ unet_config = {
     "learn_sigma": True,
     "class_cond": False,
     "use_checkpoint": False,
-    "attention_resolutions": '16',
+    "attention_resolutions": 16,
     "num_heads": 4,
     "num_head_channels": 64,
     "num_heads_upsample": -1,
@@ -44,7 +44,24 @@ unet_config = {
     "dropout": 0.0,
     "resblock_updown": True,
     "use_fp16": False,
-    "use_new_attention_order": False
+    "use_new_attention_order": False,
+    "freeze_unet": False
+}
+
+id_ext_config = {
+    "version": "v4",
+    "out_channel": 256,
+    "num_latent": 8,
+    "recognition_config":{
+        "dataset": "webface4m",
+        "loss_fn": "adaface",
+        "normalize_feature": False,
+        "return_spatial": [2],
+        "head_name": None,
+        "backbone": "ir_50",
+        "ckpt_path": '/pretrained_models/adaface_ir50_casia.ckpt',
+        "center_path": '/pretrained_models/center_ir_50_adaface_casia_faces_webface_112x112.pth'
+    }
 }
 
 def train(cfg):
@@ -68,6 +85,7 @@ def train(cfg):
 
     model = MyModelTrainer(datamodule=datamodule,
                            unet_config=unet_config,
+                           id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"])

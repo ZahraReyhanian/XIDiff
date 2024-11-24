@@ -11,12 +11,12 @@ from utils.training_utils import EMAModel
 from utils.training_utils import q_xt_x0
 from losses.consistency_loss import calc_identity_consistency_loss
 import torch
+from recognition.recognition_helper import make_id_extractor
 
 class Trainer(pl.LightningModule):
     """main class"""
 
-    def __init__(self, datamodule=None, unet_config=None, output_dir=None, ckpt_path=None, mse_loss_lambda=1, identity_consistency_loss_lambda=0.05,optimizer=torch.optim.AdamW,
-                 *args, **kwargs):
+    def __init__(self, datamodule=None, unet_config=None, id_ext_config=None,  output_dir=None, ckpt_path=None, mse_loss_lambda=1, identity_consistency_loss_lambda=0.05,optimizer=torch.optim.AdamW):
 
         super(Trainer, self).__init__()
 
@@ -33,9 +33,10 @@ class Trainer(pl.LightningModule):
             self.model.enable_gradient_checkpointing()
 
         self.valid_loss_metric = torchmetrics.MeanMetric()
+        self.id_extractor = make_id_extractor(id_ext_config, unet_config)
 
         #TODO disabled training
-        # self.recognition_model: RecognitionModel = make_recognition_model(self.hparams.recognition)
+        # self.recognition_model: RecognitionModel = make_recognition_model(self.recognition)
         # self.recognition_model_eval = self.recognition_model
 
 
@@ -46,7 +47,13 @@ class Trainer(pl.LightningModule):
             self.model.load_state_dict(model_statedict)
 
     def get_parameters(self):
-        params = list(self.model.parameters())
+        if self.unet_config['freeze_unet']:
+            print('freeze unet skip optim params')
+            params = []
+        else:
+            params = list(self.model.parameters())
+        if self.label_mapping is not None:
+            params = params + list(self.label_mapping.parameters())
         return params
 
     def configure_optimizers(self):

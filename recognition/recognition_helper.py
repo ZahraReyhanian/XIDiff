@@ -1,8 +1,6 @@
 import subprocess, sys, os
 sys.path.append(os.getcwd().split('datagen_framework')[0] + 'datagen_framework')
 import os
-import torch
-from torch import nn as nn
 import numpy as np
 from PIL import Image
 import torch.nn.functional as F
@@ -11,8 +9,12 @@ from recognition.tface_model import Backbone
 from recognition.adaface import AdaFaceV3
 from utils import os_utils
 from recognition import tface_model
-from functools import partial
 from typing import Dict
+
+import torch.nn as nn
+import math
+import torch
+import copy
 
 def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn):
     print('------------------------------------------')
@@ -176,10 +178,7 @@ class RecognitionModel(nn.Module):
         else:
             feature = feature * norm
 
-        if self.recognition_config.return_spatial:
-            return feature, spatials
-        else:
-            return feature
+        return feature, spatials
 
     def classify(self, features, norms, label):
         return self.head(features, norms, label)
@@ -217,37 +216,37 @@ def make_recognition_model(recognition_config, enable_training=False):
     if not recognition_config:
         return None
 
-    if 'ir_101' == recognition_config.backbone:
+    if 'ir_101' == recognition_config["backbone"]:
         print('making IR_101')
         backbone = tface_model.IR_101(input_size=(112, 112))
         backbone_name = 'ir_101'
-    elif 'ir_50' == recognition_config.backbone:
+    elif 'ir_50' == recognition_config["backbone"]:
         print('making IR_50')
         backbone_name = 'ir_50'
         backbone = tface_model.IR_50(input_size=(112, 112))
     else:
         raise NotImplementedError()
 
-    head = return_head(head_name=recognition_config.head_name)
+    head = return_head(head_name=recognition_config["head_name"])
 
-    if recognition_config.ckpt_path:
+    if recognition_config["ckpt_path"]:
         print('loading backbone and head checkpoint from ')
-        print(recognition_config.ckpt_path)
-        statedict = torch.load(recognition_config.ckpt_path, map_location='cpu')['state_dict']
+        print(recognition_config["ckpt_path"])
+        statedict = torch.load(recognition_config["ckpt_path"], map_location='cpu')['state_dict']
         backbone.load_state_dict({k.replace("model.", ''): v for k, v in statedict.items() if 'model.' in k})
         if head is not None:
             head.load_state_dict({k.replace("head.", ''): v for k, v in statedict.items() if 'head.' in k})
     else:
         # load statedict
-        assert recognition_config.dataset == 'webface4m'
-        assert recognition_config.loss_fn == 'adaface'
+        assert recognition_config["dataset"] == 'webface4m'
+        assert recognition_config["loss_fn"] == 'adaface'
         print('Loading pretrained IR model trained with adaface webface4m')
         model_statedict = download_ir_pretrained_statedict(backbone_name, 'webface4m', 'adaface')
         backbone.load_state_dict(model_statedict, strict=True)
 
-    if recognition_config.center_path:
-        print('Loading precomputed center', recognition_config.center_path)
-        center = torch.load(recognition_config.center_path, map_location='cpu')['center']
+    if recognition_config["center_path"]:
+        print('Loading precomputed center', recognition_config["center_path"])
+        center = torch.load(recognition_config["center_path"], map_location='cpu')['center']
         center_emb = nn.Embedding(num_embeddings=center.shape[0], embedding_dim=center.shape[1])
         center_emb.load_state_dict({'weight': center}, strict=True)
     else:
@@ -265,3 +264,66 @@ def make_recognition_model(recognition_config, enable_training=False):
 
     return model
 
+
+def make_id_extractor(config, unet_config):
+    if config.version == None:
+        label_mapping = nn.Identity()
+    elif config.version == 'v4':
+        # image condition
+        config.recognition_config = copy.copy(config.recognition_config)
+        config.recognition_config['ckpt_path'] = None
+        config.recognition_config['center_path'] = None
+        config.recognition_config['return_spatial'] = [21]
+        model = make_recognition_model(config.recognition_config, enable_training=True)
+        label_mapping = ImageEmbedder(backbone=model)
+        out = label_mapping.forward(torch.randn(3,3,112,112))
+    else:
+        raise ValueError('')
+
+    return label_mapping
+
+
+class ImageEmbedder(nn.Module):
+
+    def __init__(self, backbone, with_cross_attention_adopter=False):
+        super(ImageEmbedder, self).__init__()
+        self.backbone = backbone
+        num_latent = 50
+        latent_dim = 512
+        pos_emb_init = positionalencoding1d(latent_dim, num_latent) - 0.5
+        self.pos_emb = nn.ParameterList([nn.Parameter(pos_emb_init)])
+        self.scaler = nn.ParameterList([nn.Parameter(torch.ones(1) * 0.001)])
+        if with_cross_attention_adopter:
+            self.cross_attn_adapter = nn.Conv1d(in_channels=512, out_channels=1024, kernel_size=1)
+
+    def forward(self, x):
+        feature, spatial = self.backbone(x)
+        spatial = spatial[0]
+        shape = spatial.shape
+        spatial = spatial.view(shape[0], shape[1], -1)
+        feature = feature.unsqueeze(2)
+        out = torch.cat([feature, spatial], dim=2).transpose(1, 2)
+        out = out + self.pos_emb[0][None, :, :]
+        id = out[:, 0, :] * self.scaler[0]
+        cross_att = out[:, 1:, :]
+        return id, cross_att
+
+
+
+def positionalencoding1d(d_model, length):
+    """
+    :param d_model: dimension of the model
+    :param length: length of positions
+    :return: length*d_model position matrix
+    """
+    if d_model % 2 != 0:
+        raise ValueError("Cannot use sin/cos positional encoding with "
+                         "odd dim (got dim={:d})".format(d_model))
+    pe = torch.zeros(length, d_model)
+    position = torch.arange(0, length).unsqueeze(1)
+    div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                          -(math.log(10000.0) / d_model)))
+    pe[:, 0::2] = torch.sin(position.float() * div_term)
+    pe[:, 1::2] = torch.cos(position.float() * div_term)
+
+    return pe

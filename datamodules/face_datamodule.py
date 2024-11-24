@@ -3,6 +3,7 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from keras.utils import image_dataset_from_directory
 from torchvision import datasets, transforms
+import kagglehub
 
 class FaceDataModule(LightningDataModule):
 
@@ -36,9 +37,16 @@ class FaceDataModule(LightningDataModule):
                                             transforms.ToTensor()])
 
             # load dataset
-            self.data_train = datasets.ImageFolder('data/train', transform=transform)
-            self.data_val = datasets.ImageFolder('data/valid', transform=transform)
-            self.data_test = datasets.ImageFolder('data/test', transform=transform)
+            # self.data_train = datasets.ImageFolder('data/train', transform=transform)
+            # self.data_val = datasets.ImageFolder('data/valid', transform=transform)
+            # self.data_test = datasets.ImageFolder('data/test', transform=transform)
+
+            # Download latest version
+            path = kagglehub.dataset_download("msambare/fer2013")
+            # load dataset
+            self.data_train = datasets.ImageFolder(f'{path}/train', transform=transform)
+            self.data_val = datasets.ImageFolder(f'{path}/valid', transform=transform)
+
 
     def train_dataloader(self):
         return DataLoader(

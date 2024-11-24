@@ -5,7 +5,7 @@ def make_condition(pl_module, batch):
 
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
 
-    id_feat, id_cross_att = pl_module.label_mapping(batch['id_image'])
+    id_feat, id_cross_att = pl_module.id_extractor(batch[0])
     id_cross_att = torch.cat([id_feat.unsqueeze(1), id_cross_att], dim=1)
     _, spatial = pl_module.recognition_model(batch['image'].to(pl_module.device))
     ext_mapping = pl_module.external_mapping(spatial)
@@ -13,7 +13,7 @@ def make_condition(pl_module, batch):
     result['cross_attn'] = pl_module.label_mapping.cross_attn_adapter(cross_attn)
     result['stylemod'] = ext_mapping
 
-    class_label = batch['class_label'].to(pl_module.device)
+    class_label = batch[1].to(pl_module.device)
     center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
 
 
