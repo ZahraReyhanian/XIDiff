@@ -36,7 +36,7 @@ unet_config = {
     "learn_sigma": True,
     "class_cond": False,
     "use_checkpoint": False,
-    "attention_resolutions": 16,
+    "attention_resolutions": "16",
     "num_heads": 4,
     "num_head_channels": 64,
     "num_heads_upsample": -1,
@@ -57,12 +57,13 @@ id_ext_config = {
         "loss_fn": "adaface",
         "normalize_feature": False,
         "return_spatial": [2],
-        "head_name": None,
+        "head_name": 'none',
         "backbone": "ir_50",
-        "ckpt_path": '/pretrained_models/adaface_ir50_casia.ckpt',
-        "center_path": '/pretrained_models/center_ir_50_adaface_casia_faces_webface_112x112.pth'
+        "ckpt_path": '/pretrained_models/adaface_ir50_webface4m.ckpt',
+        "center_path": '/pretrained_models/center_ir_50_adaface_webface4m_faces_webface_112x112.pth'
     }
 }
+
 
 def train(cfg):
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during

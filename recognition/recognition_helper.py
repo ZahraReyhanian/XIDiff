@@ -21,27 +21,27 @@ def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn):
     print(backbone_name)
     if backbone_name == 'ir_101' and dataset_name == 'webface4m' and loss_fn == 'adaface':
 
-        root = os_utils.get_project_root(project_name='dcface')
+        root = os_utils.get_project_root(project_name='')
         _name, _id = 'adaface_ir101_webface4m.ckpt', '18jQkqB0avFqWa0Pas52g54xNshUOQJpQ'
     elif backbone_name == 'ir_50' and dataset_name == 'webface4m' and loss_fn == 'adaface':
-        root = os_utils.get_project_root(project_name='dcface')
+        root = os_utils.get_project_root(project_name='')
         _name, _id = 'adaface_ir50_webface4m.ckpt', '1BmDRrhPsHSbXcWZoYFPJg2KJn1sd3QpN'
     else:
         raise NotImplementedError()
     checkpoint_path = os.path.join(root, 'pretrained_models', _name)
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
-    print('path: '+checkpoint_path)
-    if not os.path.isfile(checkpoint_path):
-        subprocess.check_call([sys.executable, "-m", "pip", "install", 'gdown'])
-        try:
-            subprocess.check_call([os.path.expanduser('~/.local/bin/gdown'), '--id', _id], shell=True)
-        except:
-            subprocess.check_call([os.path.expanduser('D:\\anaconda3\envs\Env1\Lib\site-packages\gdown'), '--id', _id], shell=True)
-        if not os.path.isdir(os.path.dirname(checkpoint_path)):
-            subprocess.check_call(['mkdir', '-p', os.path.dirname(checkpoint_path)])
-        subprocess.check_call(['mv', _name, checkpoint_path], shell=True)
+    print('path: '+checkpoint_path+'--------------------------------------------------------------')
+    # if not os.path.isfile(checkpoint_path):
+    #     subprocess.check_call([sys.executable, "-m", "pip", "install", 'gdown'])
+    #     try:
+    #         subprocess.check_call([os.path.expanduser('~/.local/bin/gdown'), '--id', _id], shell=True)
+    #     except:
+    #         subprocess.check_call([os.path.expanduser('/home/reyhanian/miniconda3/bin/gdown'), '--id', _id], shell=True)
+    #     if not os.path.isdir(os.path.dirname(checkpoint_path)):
+    #         subprocess.check_call(['mkdir', '-p', os.path.dirname(checkpoint_path)])
+    #     subprocess.check_call(['mv', _name, checkpoint_path], shell=True)
 
-    assert os.path.isfile(checkpoint_path)
+    # assert os.path.isfile(checkpoint_path)
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     state_dict = checkpoint['state_dict']
     model_statedict = {k.replace('model.', ''): v for k, v in state_dict.items() if k.startswith('model.')}
@@ -171,9 +171,9 @@ class RecognitionModel(nn.Module):
         # from general_utils import img_utils
         # import cv2
         # cv2.imwrite('/mckim/temp/temp.png', img_utils.tensor_to_numpy(x[0].cpu()))
-        feature, norm, spatials = self.backbone(x, return_spatial=self.recognition_config.return_spatial)
+        feature, norm, spatials = self.backbone(x, return_spatial=self.recognition_config["return_spatial"])
 
-        if self.recognition_config.normalize_feature:
+        if self.recognition_config["normalize_feature"]:
             feature = feature
         else:
             feature = feature * norm
@@ -266,15 +266,15 @@ def make_recognition_model(recognition_config, enable_training=False):
 
 
 def make_id_extractor(config, unet_config):
-    if config.version == None:
+    if config["version"] == None:
         label_mapping = nn.Identity()
-    elif config.version == 'v4':
+    elif config["version"] == 'v4':
         # image condition
-        config.recognition_config = copy.copy(config.recognition_config)
-        config.recognition_config['ckpt_path'] = None
-        config.recognition_config['center_path'] = None
-        config.recognition_config['return_spatial'] = [21]
-        model = make_recognition_model(config.recognition_config, enable_training=True)
+        config["recognition_config"] = copy.copy(config["recognition_config"])
+        config["recognition_config"]['ckpt_path'] = None
+        config["recognition_config"]['center_path'] = None
+        config["recognition_config"]['return_spatial'] = [21]
+        model = make_recognition_model(config["recognition_config"], enable_training=True)
         label_mapping = ImageEmbedder(backbone=model)
         out = label_mapping.forward(torch.randn(3,3,112,112))
     else:

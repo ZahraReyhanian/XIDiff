@@ -18,8 +18,7 @@ def create_model(
         resblock_updown=False,
         use_fp16=False,
         use_new_attention_order=False,
-        condition_type=None,
-        cross_attn_dim=None
+        freeze_unet=False
 ):
     if channel_mult == "":
         if image_size == 512:

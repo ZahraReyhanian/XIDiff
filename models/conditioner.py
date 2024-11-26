@@ -10,7 +10,7 @@ def make_condition(pl_module, batch):
     _, spatial = pl_module.recognition_model(batch['image'].to(pl_module.device))
     ext_mapping = pl_module.external_mapping(spatial)
     cross_attn = id_cross_att.transpose(1,2)
-    result['cross_attn'] = pl_module.label_mapping.cross_attn_adapter(cross_attn)
+    result['cross_attn'] = pl_module.id_extractor.cross_attn_adapter(cross_attn)
     result['stylemod'] = ext_mapping
 
     class_label = batch[1].to(pl_module.device)
@@ -58,7 +58,7 @@ def mix_hidden_states(encoder_hidden_states, mixing_hidden_states, condition_typ
             result['add'] = source_label
 
     elif condition_type == 'cross_attn' and condition_source == 'patchstat_spatial_and_linear_label_center':
-        num_label_features = pl_module.label_mapping.pos_emb[0].shape[0]
+        num_label_features = pl_module.id_extractor.pos_emb[0].shape[0]
         if mixing_method == 'label_interpolate':
             mixed_label = source_alpha * source_label + (1-source_alpha) * mixing_label
             mixed = torch.cat([mixed_label, source_spatial], dim=1)
@@ -151,11 +151,11 @@ def split_label_spatial(condition_type, condition_source, encoder_hidden_states,
         spatial = encoder_hidden_states['concat']
 
     elif condition_type == 'cross_attn' and condition_source == 'patchstat_spatial_and_linear_label_center':
-        num_label_features = pl_module.label_mapping.pos_emb[0].shape[0]
+        num_label_features = pl_module.id_extractor.pos_emb[0].shape[0]
         label = encoder_hidden_states['cross_attn'][:, :num_label_features, :]
         spatial = encoder_hidden_states['cross_attn'][:, num_label_features:, :]
     elif condition_type == 'crossatt_and_stylemod' and condition_source == 'patchstat_spatial_and_image':
-        num_label_features = pl_module.label_mapping.pos_emb[0].shape[0] - 1
+        num_label_features = pl_module.id_extractor.pos_emb[0].shape[0] - 1
         label_feat = encoder_hidden_states['stylemod']
         label_spat = encoder_hidden_states['cross_attn'][:, :, :num_label_features]
         spatial = encoder_hidden_states['cross_attn'][:, :, num_label_features:]

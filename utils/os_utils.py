@@ -32,7 +32,10 @@ def natural_sort(l):
     return sorted(l, key=alphanum_key)
 
 def get_project_root(project_name='dcface'):
-    root = os.getcwd().rsplit(project_name, 1)[0] + project_name
+    if project_name != '':
+        root = os.getcwd().rsplit(project_name, 1)[0] + project_name
+    else:
+        root = os.getcwd()
     return root
 
 def get_task(project_name='dcface'):

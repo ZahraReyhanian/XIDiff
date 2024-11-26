@@ -11,7 +11,7 @@ from utils.training_utils import EMAModel
 from utils.training_utils import q_xt_x0
 from losses.consistency_loss import calc_identity_consistency_loss
 import torch
-from recognition.recognition_helper import make_id_extractor
+from recognition.recognition_helper import make_id_extractor, RecognitionModel, make_recognition_model
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -35,9 +35,9 @@ class Trainer(pl.LightningModule):
         self.valid_loss_metric = torchmetrics.MeanMetric()
         self.id_extractor = make_id_extractor(id_ext_config, unet_config)
 
-        #TODO disabled training
-        # self.recognition_model: RecognitionModel = make_recognition_model(self.recognition)
-        # self.recognition_model_eval = self.recognition_model
+        # disabled training
+        self.recognition_model: RecognitionModel = make_recognition_model(id_ext_config["recognition_config"])
+        self.recognition_model_eval = self.recognition_model
 
 
         if ckpt_path is not None:
@@ -52,8 +52,8 @@ class Trainer(pl.LightningModule):
             params = []
         else:
             params = list(self.model.parameters())
-        if self.label_mapping is not None:
-            params = params + list(self.label_mapping.parameters())
+        if self.id_extractor is not None:
+            params = params + list(self.id_extractor.parameters())
         return params
 
     def configure_optimizers(self):
