@@ -1,4 +1,3 @@
-from pytorch_lightning.utilities.distributed import rank_zero_only
 import os
 from typing import Any, List
 import pytorch_lightning as pl
@@ -16,7 +15,16 @@ from recognition.recognition_helper import make_id_extractor, RecognitionModel, 
 class Trainer(pl.LightningModule):
     """main class"""
 
-    def __init__(self, datamodule=None, unet_config=None, id_ext_config=None,  output_dir=None, ckpt_path=None, mse_loss_lambda=1, identity_consistency_loss_lambda=0.05,optimizer=torch.optim.AdamW):
+    def __init__(self, datamodule=None,
+                 unet_config=None,
+                 id_ext_config=None,
+                 output_dir=None,
+                 ckpt_path=None,
+                 mse_loss_lambda=1,
+                 identity_consistency_loss_lambda=0.05,
+                 optimizer=torch.optim.AdamW,
+                 *args, **kwargs
+                 ):
 
         super(Trainer, self).__init__()
 
@@ -70,21 +78,20 @@ class Trainer(pl.LightningModule):
             print(result.unexpected_keys)
         return result
 
-    @rank_zero_only
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so we need to make sure val_acc_best doesn't store accuracy from these checks
         if self.current_epoch == 0:
             # one time copy of project files
             os.makedirs(self.output_dir, exist_ok=True)
-            print("training stats....................")
+            print("training starts....................")
 
-    @rank_zero_only
     @torch.no_grad()
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx=0):
         pass
 
     def shared_step(self, batch, stage='train', optimizer_idx=0, n_steps=1000, *args, **kwargs):
+        print("---------SHARED STEPPPPPPPPPPPPPPP------")
         clean_images = batch[0]
 
         bsz = clean_images.shape[0]
@@ -139,12 +146,12 @@ class Trainer(pl.LightningModule):
     def forward(self, x, c, *args, **kwargs):
         raise ValueError('should not be here. Not Implemented')
 
-    def training_step(self, batch, batch_idx, optimizer_idx=0):
+    def training_step(self, batch, batch_idx):
         # import cv2
         # from src.general_utils.img_utils import tensor_to_numpy
         # cv2.imwrite('/mckim/temp/temp3.png',tensor_to_numpy(batch['image'].cpu()[10])) # this is in rgb. so wrong color saved
 
-        loss, loss_dict = self.shared_step(batch, stage='train', optimizer_idx=optimizer_idx)
+        loss, loss_dict = self.shared_step(batch, stage='train')
         if self.ema_model.averaged_model.device != self.device:
             self.ema_model.averaged_model.to(self.device)
         self.ema_model.step(self.model)
@@ -161,12 +168,12 @@ class Trainer(pl.LightningModule):
         _, loss_dict = self.shared_step(batch, stage=stage)
         self.valid_loss_metric.update(loss_dict[f'{stage}/mse_loss'])
 
-    def validation_epoch_end(self, outputs, stage='val', *args, **kwargs):
-        # self.log('num_samples', self.num_samples)
-        self.log('epoch', self.current_epoch)
-        self.log('global_step', self.global_step)
-        self.log(f'{stage}/mse_loss', self.valid_loss_metric.compute())
-        self.valid_loss_metric.reset()
+    # def validation_epoch_end(self, outputs, stage='val', *args, **kwargs):
+    #     # self.log('num_samples', self.num_samples)
+    #     self.log('epoch', self.current_epoch)
+    #     self.log('global_step', self.global_step)
+    #     self.log(f'{stage}/mse_loss', self.valid_loss_metric.compute())
+    #     self.valid_loss_metric.reset()
 
     def on_train_batch_end(self, *args, **kwargs):
         pass

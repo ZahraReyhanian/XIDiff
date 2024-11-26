@@ -98,7 +98,7 @@ def train(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = Trainer(callbacks=callbacks, strategy=strategy)
+    trainer = Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy)
 
     object_dict = {
         "cfg": cfg,
@@ -108,10 +108,6 @@ def train(cfg):
         # "logger": logger,
         "trainer": trainer,
     }
-
-    # if logger:
-    #     print("Logging hyperparameters!")
-    #     log_hyperparameters(object_dict)
 
     if cfg["train"]:
         print("Starting training...")
@@ -172,8 +168,6 @@ def main():
     # cfg.datamodule.batch_size = int(cfg.datamodule.total_gpu_batch_size / available_gpus)
     # print('Per GPU batchsize:', cfg.datamodule.batch_size)
     # time.sleep(1)
-    #
-    # cfg = option_parsing.post_process(cfg)
 
     # train the model
     metric_dict, _ = train(cfg)

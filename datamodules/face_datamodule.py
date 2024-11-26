@@ -53,9 +53,9 @@ class FaceDataModule(LightningDataModule):
             shuffle=False,
         )
 
-    def test_dataloader(self):
-        return DataLoader(
-            dataset=self.data_test,
-            batch_size=self.batch_size,
-            shuffle=False,
-        )
+    # def test_dataloader(self):
+    #     return DataLoader(
+    #         dataset=self.data_test,
+    #         batch_size=self.batch_size,
+    #         shuffle=False,
+    #     )
