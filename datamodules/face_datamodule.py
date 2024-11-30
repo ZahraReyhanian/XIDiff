@@ -44,6 +44,7 @@ class FaceDataModule(LightningDataModule):
             dataset=self.data_train,
             batch_size=self.batch_size,
             shuffle=True,
+            num_workers=11
         )
 
     def val_dataloader(self):
@@ -51,6 +52,7 @@ class FaceDataModule(LightningDataModule):
             dataset=self.data_val,
             batch_size=self.batch_size,
             shuffle=False,
+            num_workers=11
         )
 
     # def test_dataloader(self):
