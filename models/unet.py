@@ -170,6 +170,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     """
 
     def forward(self, x, emb, cross_attn=None, stylemod=None):
+        # x.device = cuda
         for layer in self:
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
@@ -775,7 +776,7 @@ class UNetModel(nn.Module):
         ), "must specify y if and only if the model is class-conditional"
 
 
-
+        print("+++++++++++++++++++++++++++++++++++++++++++++++++++")
         hs = []
 
         if not torch.is_tensor(timesteps):
@@ -783,6 +784,7 @@ class UNetModel(nn.Module):
         elif torch.is_tensor(timesteps) and len(timesteps.shape) == 0:
             timesteps = timesteps[None].to(x.device)
 
+        self.time_embed.to(timesteps.device)
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
 
         if self.num_classes is not None:
@@ -791,18 +793,20 @@ class UNetModel(nn.Module):
 
         #TODO check
         cross_attn = encoder_hidden_states['cross_attn']
-        stylemod = encoder_hidden_states['stylemod']
-        emb = emb + stylemod
+        cross_attn.to(x.device)
+        stylemod = None
+        # emb = emb + stylemod
 
 
         h = x.type(self.dtype)
-        # print(h.shape)
+
         for module in self.input_blocks:
+            # print(h.device)
             h = module(h, emb, cross_attn=cross_attn, stylemod=stylemod)
-            # print(h.shape)
+
             hs.append(h)
         h = self.middle_block(h, emb, cross_attn=cross_attn, stylemod=stylemod)
-        # print(h.shape)
+
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
             # print(h.shape)

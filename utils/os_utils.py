@@ -48,12 +48,12 @@ def make_runname(prefix):
 
 def make_output_dir(exp_root, task, runname):
     output_dir = os.path.join(exp_root, task, runname)
-    is_taken = os.path.isdir(output_dir) and os.path.isfile(os.path.join(output_dir, 'src','train.py'))
+    is_taken = os.path.isdir(output_dir) and os.path.isfile(os.path.join(output_dir, '','train.py'))
     if is_taken:
         while True:
             cur_exp_number = int(output_dir[-2:].replace('_', ""))
             output_dir = output_dir[:-2] + "_{}".format(cur_exp_number+1)
-            is_taken = os.path.isdir(output_dir) and os.path.isfile(os.path.join(output_dir, 'src', 'train.py'))
+            is_taken = os.path.isdir(output_dir) and os.path.isfile(os.path.join(output_dir, '', 'train.py'))
             if not is_taken:
                 break
     return output_dir

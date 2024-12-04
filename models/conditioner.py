@@ -7,20 +7,23 @@ def make_condition(pl_module, batch):
 
     id_feat, id_cross_att = pl_module.id_extractor(batch[0])
     id_cross_att = torch.cat([id_feat.unsqueeze(1), id_cross_att], dim=1)
-    _, spatial = pl_module.recognition_model(batch['image'].to(pl_module.device))
-    ext_mapping = pl_module.external_mapping(spatial)
+    _, spatial = pl_module.recognition_model(batch[0].to(pl_module.device))
+    # ext_mapping = pl_module.external_mapping(spatial)
     cross_attn = id_cross_att.transpose(1,2)
     result['cross_attn'] = pl_module.id_extractor.cross_attn_adapter(cross_attn)
-    result['stylemod'] = ext_mapping
+    # result['stylemod'] = ext_mapping
 
     class_label = batch[1].to(pl_module.device)
-    center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
+
+    if pl_module.recognition_model.center!=None:
+        center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
 
 
-    if center_emb.shape[1] == 1:
-        center_emb = center_emb.squeeze(1)
+        if center_emb.shape[1] == 1:
+            center_emb = center_emb.squeeze(1)
 
-    result['center_emb'] = center_emb
+        result['center_emb'] = center_emb
+
     return result
 
 

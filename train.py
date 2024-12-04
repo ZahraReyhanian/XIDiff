@@ -1,25 +1,9 @@
 import os
 import json
 import torch
-# root = pyrootutils.setup_root(
-#     search_from=__file__,
-#     indicator=[".git", "pyproject.toml"],
-#     pythonpath=True,
-#     dotenv=True,
-# )
-# dotenv.load_dotenv(dotenv_path=root.parent.parent / '.env', override=True)
-# assert os.getenv('DATA_ROOT')
-# assert os.path.isdir(os.getenv('DATA_ROOT'))
-# import time
-#
-# LOG_ROOT = str(root.parent / 'experiments')
-# os.environ.update({'LOG_ROOT': LOG_ROOT})
-# os.environ.update({'PROJECT_TASK': root.stem})
-# os.environ.update({'REPO_ROOT': str(root.parent)})
 
 from typing import Tuple
 import pytorch_lightning as pl
-from pytorch_lightning import Callback, LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.strategies.ddp import DDPStrategy
 from pytorch_lightning.loggers.wandb import WandbLogger
 from Trainer import Trainer as MyModelTrainer
@@ -27,6 +11,9 @@ from utils import os_utils
 from utils.training_utils import log_hyperparameters
 from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+
 
 unet_config = {
     "image_size": 112,
@@ -60,12 +47,12 @@ id_ext_config = {
         "head_name": 'none',
         "backbone": "ir_50",
         "ckpt_path": '/pretrained_models/adaface_ir50_webface4m.ckpt',
-        "center_path": '/pretrained_models/center_ir_50_adaface_webface4m_faces_webface_112x112.pth'
+        # "center_path": '/pretrained_models/center_ir_50_adaface_webface4m_faces_webface_112x112.pth'
     }
 }
 
 
-def train(cfg):
+def training(cfg):
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
     training.
 
@@ -82,10 +69,9 @@ def train(cfg):
     # set seed for random number generators in pytorch, numpy and python.random
     pl.seed_everything(cfg["seed"], workers=True)
 
-    datamodule = FaceDataModule(dataset_path=cfg["dataset_path"])
+    # datamodule = FaceDataModule(dataset_path=cfg["dataset_path"])
 
-    model = MyModelTrainer(datamodule=datamodule,
-                           unet_config=unet_config,
+    model = MyModelTrainer(unet_config=unet_config,
                            id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
@@ -98,24 +84,50 @@ def train(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy)
 
     object_dict = {
         "cfg": cfg,
-        "datamodule": datamodule,
+        # "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
         # "logger": logger,
         "trainer": trainer,
     }
 
-    if cfg["train"]:
-        print("Starting training...")
-        if cfg["ckpt_path"]:
-            print('continuing from ', cfg["ckpt_path"])
-        trainer.fit(model=model, datamodule=datamodule)
+    # print(model)
+    # print(datamodule.setup())
 
-    train_metrics = trainer.callback_metrics
+    print("TYPEEEEEEEEEEEEEEEEEEEEEEEEEE")
+
+    print(type(model))
+    # print(type(datamodule))
+
+    transform = transforms.Compose([transforms.Resize((48, 48)),
+                                    transforms.ToTensor()])
+
+    # load dataset
+    # path = "D:/uni/Articles/codes/dataset/fer2013/"
+    path = "/home/reyhanian/project/data/fer2013/"
+    data_train = datasets.ImageFolder(f'{path}train', transform=transform)
+    data_val = datasets.ImageFolder(f'{path}test', transform=transform)
+    train_loader = DataLoader(dataset=data_train, batch_size=32, shuffle=True)
+    val_loader = DataLoader(dataset=data_val, batch_size=32, shuffle=False)
+
+    for batch in train_loader:
+        print(model.training_step(batch, 0))
+        break
+    # if cfg["training"]:
+    #     print("Starting training...")
+    #     if cfg["ckpt_path"]:
+    #         print('continuing from ', cfg["ckpt_path"])
+    #     # print('*****************************************************',type(trainer.train))
+    #     trainer.fit(model, train_loader, val_loader)
+    #
+    # train_metrics = trainer.callback_metrics
+
+
+
 
     #TODO test
     # if cfg.get("test"):
@@ -170,7 +182,7 @@ def main():
     # time.sleep(1)
 
     # train the model
-    metric_dict, _ = train(cfg)
+    metric_dict, _ = training(cfg)
     print(metric_dict)
 
 

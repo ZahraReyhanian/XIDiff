@@ -15,7 +15,7 @@ from recognition.recognition_helper import make_id_extractor, RecognitionModel, 
 class Trainer(pl.LightningModule):
     """main class"""
 
-    def __init__(self, datamodule=None,
+    def __init__(self,
                  unet_config=None,
                  id_ext_config=None,
                  output_dir=None,
@@ -29,13 +29,13 @@ class Trainer(pl.LightningModule):
         super(Trainer, self).__init__()
 
         self.optimizer = optimizer
-        self.datamodule = datamodule
         self.unet_config = unet_config
         self.output_dir = output_dir
         self.mse_loss_lambda = mse_loss_lambda
         self.identity_consistency_loss_lambda = identity_consistency_loss_lambda
 
         self.model = model_helper.make_unet(unet_config)
+
         self.ema_model = EMAModel(self.model, inv_gamma=1.0, power=3 / 4, max_value=0.9999)
         if 'gradient_checkpointing' in unet_config and unet_config['gradient_checkpointing']:
             self.model.enable_gradient_checkpointing()
@@ -97,9 +97,12 @@ class Trainer(pl.LightningModule):
         bsz = clean_images.shape[0]
 
         # Sample a random timestep for each image
+        use_cuda = torch.cuda.is_available()
+        device = torch.device("cuda" if use_cuda else "cpu")
+
         timesteps = torch.randint(
             0, n_steps, (bsz,), device=clean_images.device
-        ).long()
+        ).long().to(device)
 
         loss_dict = {}
         total_loss = 0.0

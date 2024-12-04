@@ -579,7 +579,7 @@ val_losses = []
 
 for epoch in range(epochs):
     #train step
-    unet.train()
+    unet.training()
     train_loss = 0
 
     #number of iteration

@@ -258,7 +258,7 @@ def make_recognition_model(recognition_config, enable_training=False):
         pass
     else:
         model = model.eval()
-        model.train = False
+        model.training = False
         for param in model.parameters():
             param.requires_grad = False
 
@@ -285,7 +285,7 @@ def make_id_extractor(config, unet_config):
 
 class ImageEmbedder(nn.Module):
 
-    def __init__(self, backbone, with_cross_attention_adopter=False):
+    def __init__(self, backbone, with_cross_attention_adopter=True):
         super(ImageEmbedder, self).__init__()
         self.backbone = backbone
         num_latent = 50
