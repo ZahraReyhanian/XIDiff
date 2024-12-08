@@ -1,3 +1,4 @@
 .idea/*
 data/*
 config/config.json
+pretrained_models/*
