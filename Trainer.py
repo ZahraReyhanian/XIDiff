@@ -91,7 +91,6 @@ class Trainer(pl.LightningModule):
         if self.current_epoch == 0:
             # one time copy of project files
             os.makedirs(self.output_dir, exist_ok=True)
-            print("training starts....................")
 
     @torch.no_grad()
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx=0):

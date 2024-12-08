@@ -159,7 +159,7 @@ class RecognitionModel(nn.Module):
             x = orig_images
 
         elif x.shape[2] != self.size or x.shape[3] != self.size:
-            print('why is this happening?')
+            # print('why is this happening?')
             quantized_x = self.quantize_images(x)
             x = self.resize_and_normalize(quantized_x, device=x.device)
 

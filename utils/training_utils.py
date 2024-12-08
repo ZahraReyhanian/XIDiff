@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 from functools import partial
 from pytorch_lightning.utilities import rank_zero_only
+from torchvision.utils import save_image
+from tqdm import tqdm
 
 torch.cuda.empty_cache()
 # Set up some parameters
@@ -205,3 +207,39 @@ class EMAModel(nn.Module):
 
         self.averaged_model.load_state_dict(ema_state_dict, strict=False)
         self.optimization_step += 1
+
+
+def p_xt(xt, noise, t):
+    # reverse step
+    alpha_t = gather(alpha, t)
+    alpha_bar_t = gather(alpha_bar, t)
+    beta_t = gather(beta, t)
+
+    eps_coef = (1 - alpha_t) / torch.sqrt(1 - alpha_bar_t)
+    mu = (xt - eps_coef * noise) / (torch.sqrt(alpha_t))
+    z = torch.randn_like(xt)
+    std = torch.sqrt(beta_t)
+
+    xt_1 = mu + z * std
+    return xt_1
+
+def generate_image(model, fake_image_path, im_size, pl_module, dataloader, n_images):
+    n_steps = 1000
+    # generate 100 samples
+    progress_bar = tqdm(n_steps, total=n_steps)
+
+    x = torch.randn(n_images, 3, im_size, im_size).cuda()  # Start with random noise
+    for i in range(n_steps):
+
+        timesteps = torch.randint(
+            n_steps-i-1, (n_images,), device=device
+        ).long().to(device)
+        with torch.no_grad():
+            encoder_hidden_states = pl_module.get_encoder_hidden_states(dataloader, batch_size=None)
+            pred_noise = model(x.float(), timesteps, encoder_hidden_states=encoder_hidden_states).sample
+            x = p_xt(x, pred_noise, timesteps)
+
+            progress_bar.update(1)
+        # fake_images_tensor.append()
+    for i in range(n_images):
+        save_image(tensor=x[i], fp=f'{fake_image_path}/img_{i}.png')

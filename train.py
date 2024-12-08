@@ -5,15 +5,15 @@ import torch
 from typing import Tuple
 import pytorch_lightning as pl
 from pytorch_lightning.strategies.ddp import DDPStrategy
-from pytorch_lightning.loggers.wandb import WandbLogger
+# from pytorch_lightning.loggers.wandb import WandbLogger
+# from utils.training_utils import log_hyperparameters
+from torch.utils.data import DataLoader
 from Trainer import Trainer as MyModelTrainer
 from utils import os_utils
-from utils.training_utils import log_hyperparameters
 from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
+from utils.training_utils import generate_image
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
 
 unet_config = {
     "image_size": 112,
@@ -69,7 +69,7 @@ def training(cfg):
     # set seed for random number generators in pytorch, numpy and python.random
     pl.seed_everything(cfg["seed"], workers=True)
 
-    # datamodule = FaceDataModule(dataset_path=cfg["dataset_path"])
+    datamodule = FaceDataModule(dataset_path=cfg["dataset_path"])
 
     model = MyModelTrainer(unet_config=unet_config,
                            id_ext_config= id_ext_config,
@@ -84,27 +84,16 @@ def training(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=10)
 
     object_dict = {
         "cfg": cfg,
-        # "datamodule": datamodule,
+        "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
         # "logger": logger,
         "trainer": trainer,
     }
-
-    transform = transforms.Compose([transforms.Resize((48, 48)),
-                                    transforms.ToTensor()])
-
-    # load dataset
-    # path = "D:/uni/Articles/codes/dataset/fer2013/"
-    path = "/home/reyhanian/project/data/fer2013/"
-    data_train = datasets.ImageFolder(f'{path}train', transform=transform)
-    data_val = datasets.ImageFolder(f'{path}test', transform=transform)
-    train_loader = DataLoader(dataset=data_train, batch_size=32, shuffle=True)
-    val_loader = DataLoader(dataset=data_val, batch_size=32, shuffle=False)
 
     # for batch in train_loader:
     #     print(model.training_step(batch, 0))
@@ -113,13 +102,26 @@ def training(cfg):
         print("Starting training...")
         if cfg["ckpt_path"]:
             print('continuing from ', cfg["ckpt_path"])
-        # print('*****************************************************',type(trainer.train))
-        trainer.fit(model, train_loader, val_loader)
+
+        trainer.fit(model=model, datamodule=datamodule)
 
     train_metrics = trainer.callback_metrics
 
+    transform = transforms.Compose([transforms.Resize((48,48)),
+                                    transforms.ToTensor()])
 
+    # load dataset
+    # path = "D:/uni/Articles/codes/dataset/fer2013/"
+    path = "/home/reyhanian/project/data/fer2013/"
+    data_val = datasets.ImageFolder(f'{path}test', transform=transform)
+    val_loader = DataLoader(data_val, batch_size=1)
 
+    generate_image(model=model,
+                   fake_image_path="generated_images",
+                   im_size=48,
+                   pl_module=trainer,
+                   dataloader=val_loader,
+                   n_images=len(data_val))
 
     #TODO test
     # if cfg.get("test"):
