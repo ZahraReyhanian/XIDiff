@@ -11,6 +11,7 @@ from utils.training_utils import q_xt_x0
 from losses.consistency_loss import calc_identity_consistency_loss
 import torch
 from recognition.recognition_helper import make_id_extractor, RecognitionModel, make_recognition_model
+# from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -33,6 +34,12 @@ class Trainer(pl.LightningModule):
         self.output_dir = output_dir
         self.mse_loss_lambda = mse_loss_lambda
         self.identity_consistency_loss_lambda = identity_consistency_loss_lambda
+
+        # self.noise_scheduler = DDPMScheduler(num_train_timesteps=sampler['num_train_timesteps'],
+        #                                      beta_start=sampler['beta_start'],
+        #                                      beta_end=sampler['beta_end'],
+        #                                      variance_type=sampler['variance_type'],
+        #                                      tensor_format="pt")
 
         self.model = model_helper.make_unet(unet_config)
 
@@ -91,7 +98,6 @@ class Trainer(pl.LightningModule):
         pass
 
     def shared_step(self, batch, stage='train', optimizer_idx=0, n_steps=1000, *args, **kwargs):
-        print("---------SHARED STEPPPPPPPPPPPPPPP------")
         clean_images = batch[0]
 
         bsz = clean_images.shape[0]
@@ -122,13 +128,13 @@ class Trainer(pl.LightningModule):
 
 
             #TODO extra identity_consistency_loss_lambda
-            if self.identity_consistency_loss_lambda > 0:
-                id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
-                                                                       noisy_images=noisy_images, batch=batch,
-                                                                       pl_module=self)
-                total_loss = total_loss + id_loss * self.identity_consistency_loss_lambda
-
-                loss_dict[f'{stage}/id_loss'] = id_loss
+            # if self.identity_consistency_loss_lambda > 0:
+            #     id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
+            #                                                            noisy_images=noisy_images, batch=batch,
+            #                                                            pl_module=self)
+            #     total_loss = total_loss + id_loss * self.identity_consistency_loss_lambda
+            #
+            #     loss_dict[f'{stage}/id_loss'] = id_loss
 
             loss_dict[f'{stage}/total_loss'] = total_loss
 
@@ -162,7 +168,6 @@ class Trainer(pl.LightningModule):
         #
         # # self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
         # self.log_dict(loss_dict, prog_bar=True)
-        print("Training finishhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")
 
         return loss
 

@@ -15,6 +15,10 @@ class SiLU(nn.Module):
 
 
 class GroupNorm32(nn.GroupNorm):
+    def __init__(self, num_groups, num_channels, eps=1e-05, affine=True, device=None):
+        super().__init__(num_groups, num_channels, eps, affine, device)
+        self.device = device
+
     def forward(self, x):
         return super().forward(x.float()).type(x.dtype)
 
@@ -90,14 +94,14 @@ def mean_flat(tensor):
     return tensor.mean(dim=list(range(1, len(tensor.shape))))
 
 
-def normalization(channels):
+def normalization(channels, device=None):
     """
     Make a standard normalization layer.
 
     :param channels: number of input channels.
     :return: an nn.Module for normalization.
     """
-    return GroupNorm32(32, channels)
+    return GroupNorm32(32, channels, device=device)
 
 
 def timestep_embedding(timesteps, dim, max_period=10000):

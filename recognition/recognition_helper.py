@@ -17,8 +17,6 @@ import torch
 import copy
 
 def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn):
-    print('------------------------------------------')
-    print(backbone_name)
     if backbone_name == 'ir_101' and dataset_name == 'webface4m' and loss_fn == 'adaface':
 
         root = os_utils.get_project_root(project_name='')
@@ -30,7 +28,7 @@ def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn):
         raise NotImplementedError()
     checkpoint_path = os.path.join(root, 'pretrained_models', _name)
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
-    print('path: '+checkpoint_path+'--------------------------------------------------------------')
+
     # if not os.path.isfile(checkpoint_path):
     #     subprocess.check_call([sys.executable, "-m", "pip", "install", 'gdown'])
     #     try:

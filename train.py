@@ -95,14 +95,6 @@ def training(cfg):
         "trainer": trainer,
     }
 
-    # print(model)
-    # print(datamodule.setup())
-
-    print("TYPEEEEEEEEEEEEEEEEEEEEEEEEEE")
-
-    print(type(model))
-    # print(type(datamodule))
-
     transform = transforms.Compose([transforms.Resize((48, 48)),
                                     transforms.ToTensor()])
 
@@ -114,17 +106,17 @@ def training(cfg):
     train_loader = DataLoader(dataset=data_train, batch_size=32, shuffle=True)
     val_loader = DataLoader(dataset=data_val, batch_size=32, shuffle=False)
 
-    for batch in train_loader:
-        print(model.training_step(batch, 0))
-        break
-    # if cfg["training"]:
-    #     print("Starting training...")
-    #     if cfg["ckpt_path"]:
-    #         print('continuing from ', cfg["ckpt_path"])
-    #     # print('*****************************************************',type(trainer.train))
-    #     trainer.fit(model, train_loader, val_loader)
-    #
-    # train_metrics = trainer.callback_metrics
+    # for batch in train_loader:
+    #     print(model.training_step(batch, 0))
+    #     break
+    if cfg["training"]:
+        print("Starting training...")
+        if cfg["ckpt_path"]:
+            print('continuing from ', cfg["ckpt_path"])
+        # print('*****************************************************',type(trainer.train))
+        trainer.fit(model, train_loader, val_loader)
+
+    train_metrics = trainer.callback_metrics
 
 
 

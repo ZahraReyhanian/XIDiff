@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple, Union
 from torch import Tensor, device
 
+use_cuda = torch.cuda.is_available()
+norm_device = torch.device("cuda" if use_cuda else "cpu")
 
 class BaseOutput(OrderedDict):
     """
@@ -172,6 +174,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     def forward(self, x, emb, cross_attn=None, stylemod=None):
         # x.device = cuda
         for layer in self:
+            layer.to(x.device)
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
             elif isinstance(layer, AttentionBlock):
@@ -283,7 +286,7 @@ class ResBlock(TimestepBlock):
         self.use_scale_shift_norm = use_scale_shift_norm
 
         self.in_layers = nn.Sequential(
-            normalization(channels),
+            normalization(channels, norm_device),
             nn.SiLU(),
             conv_nd(dims, channels, self.out_channels, 3, padding=1),
         )
@@ -307,7 +310,7 @@ class ResBlock(TimestepBlock):
             ),
         )
         self.out_layers = nn.Sequential(
-            normalization(self.out_channels),
+            normalization(self.out_channels, norm_device),
             nn.SiLU(),
             nn.Dropout(p=dropout),
             zero_module(
@@ -387,7 +390,7 @@ class AttentionBlock(nn.Module):
             ), f"q,k,v channels {channels} is not divisible by num_head_channels {num_head_channels}"
             self.num_heads = channels // num_head_channels
         self.use_checkpoint = use_checkpoint
-        self.norm = normalization(channels)
+        self.norm = normalization(channels, norm_device)
         self.qkv = conv_nd(1, channels, channels * 3, 1)
         if use_new_attention_order:
             # split qkv before split heads
@@ -412,9 +415,9 @@ class AttentionBlock(nn.Module):
         b, c, *spatial = x.shape
         x = x.reshape(b, c, -1)
         qkv = self.qkv(self.norm(x))
+        cross_attn.to(x.device)
+
         if cross_attn is not None:
-            # if self.encoder_kv is not None:
-            #     cross_attn = self.encoder_kv(cross_attn)
             h = self.attention(qkv, cross_attn)
         else:
             h = self.attention(qkv)
@@ -466,6 +469,8 @@ class QKVAttentionLegacy(nn.Module):
         if encoder_kv is not None:
             assert encoder_kv.shape[1] == self.n_heads * ch * 2
             ek, ev = encoder_kv.reshape(bs * self.n_heads, ch * 2, -1).split(ch, dim=1)
+            ek = ek.to(device=k.device)
+            ev = ev.to(device=v.device)
             k = th.cat([ek, k], dim=-1)
             v = th.cat([ev, v], dim=-1)
         scale = 1 / math.sqrt(math.sqrt(ch))
@@ -741,10 +746,10 @@ class UNetModel(nn.Module):
                 self._feature_size += ch
 
         self.out = nn.Sequential(
-            normalization(ch),
+            normalization(ch, norm_device),
             nn.SiLU(),
             zero_module(conv_nd(dims, input_ch, out_channels, 3, padding=1)),
-        )
+        ).to(norm_device)
 
     def convert_to_fp16(self):
         """
@@ -775,8 +780,6 @@ class UNetModel(nn.Module):
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"
 
-
-        print("+++++++++++++++++++++++++++++++++++++++++++++++++++")
         hs = []
 
         if not torch.is_tensor(timesteps):
@@ -1000,7 +1003,7 @@ class EncoderUNetModel(nn.Module):
         self.pool = pool
         if pool == "adaptive":
             self.out = nn.Sequential(
-                normalization(ch),
+                normalization(ch, norm_device),
                 nn.SiLU(),
                 nn.AdaptiveAvgPool2d((1, 1)),
                 zero_module(conv_nd(dims, ch, out_channels, 1)),
@@ -1009,7 +1012,7 @@ class EncoderUNetModel(nn.Module):
         elif pool == "attention":
             assert num_head_channels != -1
             self.out = nn.Sequential(
-                normalization(ch),
+                normalization(ch, norm_device),
                 nn.SiLU(),
                 AttentionPool2d(
                     (image_size // ds), ch, num_head_channels, out_channels
@@ -1024,7 +1027,7 @@ class EncoderUNetModel(nn.Module):
         elif pool == "spatial_v2":
             self.out = nn.Sequential(
                 nn.Linear(self._feature_size, 2048),
-                normalization(2048),
+                normalization(2048, norm_device),
                 nn.SiLU(),
                 nn.Linear(2048, self.out_channels),
             )

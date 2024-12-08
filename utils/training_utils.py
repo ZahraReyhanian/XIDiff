@@ -190,6 +190,7 @@ class EMAModel(nn.Module):
                 ema_param = param.float().clone() if param.ndim == 1 else copy.deepcopy(param)
                 ema_params[key] = ema_param
 
+            ema_param = ema_param.to(param.data.device)
             if not param.requires_grad:
                 ema_params[key].copy_(param.to(dtype=ema_param.dtype).data)
                 ema_param = ema_params[key]
