@@ -127,13 +127,13 @@ class Trainer(pl.LightningModule):
 
 
             #TODO extra identity_consistency_loss_lambda
-            # if self.identity_consistency_loss_lambda > 0:
-            #     id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
-            #                                                            noisy_images=noisy_images, batch=batch,
-            #                                                            pl_module=self)
-            #     total_loss = total_loss + id_loss * self.identity_consistency_loss_lambda
-            #
-            #     loss_dict[f'{stage}/id_loss'] = id_loss
+            if self.identity_consistency_loss_lambda > 0:
+                id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
+                                                                       noisy_images=noisy_images, batch=batch,
+                                                                       pl_module=self)
+                total_loss = total_loss + id_loss * self.identity_consistency_loss_lambda
+
+                loss_dict[f'{stage}/id_loss'] = id_loss
 
             loss_dict[f'{stage}/total_loss'] = total_loss
 

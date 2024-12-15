@@ -223,7 +223,7 @@ def p_xt(xt, noise, t):
     xt_1 = mu + z * std
     return xt_1
 
-def generate_image(model, fake_image_path, im_size, pl_module, dataloader, n_images):
+def generate_image(model, fake_image_path, im_size, dataloader, n_images):
     n_steps = 1000
     # generate 100 samples
     progress_bar = tqdm(n_steps, total=n_steps)
@@ -235,8 +235,10 @@ def generate_image(model, fake_image_path, im_size, pl_module, dataloader, n_ima
             n_steps-i-1, (n_images,), device=device
         ).long().to(device)
         with torch.no_grad():
-            encoder_hidden_states = pl_module.get_encoder_hidden_states(dataloader, batch_size=None)
-            pred_noise = model(x.float(), timesteps, encoder_hidden_states=encoder_hidden_states).sample
+            batch = next(iter(dataloader))
+            print(batch)
+            encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
+            pred_noise = model.model(x.float(), timesteps, encoder_hidden_states=encoder_hidden_states).sample
             x = p_xt(x, pred_noise, timesteps)
 
             progress_bar.update(1)

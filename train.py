@@ -68,8 +68,9 @@ def training(cfg):
 
     # set seed for random number generators in pytorch, numpy and python.random
     pl.seed_everything(cfg["seed"], workers=True)
+    path = cfg["dataset_path"]
 
-    datamodule = FaceDataModule(dataset_path=cfg["dataset_path"])
+    datamodule = FaceDataModule(dataset_path=path)
 
     model = MyModelTrainer(unet_config=unet_config,
                            id_ext_config= id_ext_config,
@@ -84,7 +85,7 @@ def training(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=10)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=2)
 
     object_dict = {
         "cfg": cfg,
@@ -112,14 +113,12 @@ def training(cfg):
 
     # load dataset
     # path = "D:/uni/Articles/codes/dataset/fer2013/"
-    path = "/home/reyhanian/project/data/fer2013/"
     data_val = datasets.ImageFolder(f'{path}test', transform=transform)
     val_loader = DataLoader(data_val, batch_size=1)
 
     generate_image(model=model,
                    fake_image_path="generated_images",
                    im_size=48,
-                   pl_module=trainer,
                    dataloader=val_loader,
                    n_images=len(data_val))
 

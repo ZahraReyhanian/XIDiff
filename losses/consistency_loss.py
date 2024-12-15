@@ -91,7 +91,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
                                        version=pl_module.hparams.losses.identity_consistency_loss_version,
                                        max_timesteps=pl_module.hparams.sampler.num_train_timesteps,
                                        )
-    elif pl_module.hparams.losses.identity_consistency_loss_source == 'image':
+    elif pl_module.identity_consistency_loss_source == 'image':
         orig_feature, _ = recognition_model(batch['image'])
         orig_feature_norm = torch.norm(orig_feature, 2, -1, keepdim=True)
         orig_feature = orig_feature / orig_feature_norm
@@ -101,7 +101,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
                                               max_timesteps=pl_module.hparams.sampler.num_train_timesteps,
                                               )
 
-    elif pl_module.hparams.losses.identity_consistency_loss_source == 'mix':
+    elif pl_module.identity_consistency_loss_source == 'mix':
         if pl_module.hparams.losses.identity_consistency_loss_center_source == 'center':
             center = recognition_model.center(batch['class_label'])
             cossim_loss_center = calc_time_depenent_loss(x0_pred_feature, center,
@@ -157,7 +157,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
 
         cossim_loss = cossim_loss.mean()
 
-    elif pl_module.hparams.losses.identity_consistency_loss_source == 'id_image':
+    elif pl_module.identity_consistency_loss_source == 'id_image':
         orig_feature, _ = recognition_model(batch['id_image'])
         orig_feature_norm = torch.norm(orig_feature, 2, -1, keepdim=True)
         orig_feature = orig_feature / orig_feature_norm
@@ -167,7 +167,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
                                               max_timesteps=pl_module.hparams.sampler.num_train_timesteps,
                                               )
 
-    if pl_module.hparams.losses.spatial_consistency_loss_lambda > 0.0:
+    if pl_module.spatial_consistency_loss_lambda > 0.0:
         pred_mean, pred_var = extract_mean_var(spatial)
         orig_feature, orig_spatial = recognition_model(batch['image'])
         orig_mean, orig_var = extract_mean_var(orig_spatial)

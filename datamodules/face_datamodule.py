@@ -34,10 +34,8 @@ class FaceDataModule(LightningDataModule):
                                             transforms.ToTensor()])
 
             # load dataset
-            # path = "D:/uni/Articles/codes/dataset/fer2013/"
-            path = "/home/reyhanian/project/data/fer2013/"
-            self.data_train = datasets.ImageFolder(f'{path}train', transform=transform)
-            self.data_val = datasets.ImageFolder(f'{path}test', transform=transform)
+            self.data_train = datasets.ImageFolder(f'{self.dataset_path}train', transform=transform)
+            self.data_val = datasets.ImageFolder(f'{self.dataset_path}test', transform=transform)
 
             print(self.data_train)
 
