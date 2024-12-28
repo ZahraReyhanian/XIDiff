@@ -11,7 +11,7 @@ from utils.training_utils import q_xt_x0
 from losses.consistency_loss import calc_identity_consistency_loss
 import torch
 from recognition.recognition_helper import make_id_extractor, RecognitionModel, make_recognition_model
-# from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -23,7 +23,11 @@ class Trainer(pl.LightningModule):
                  ckpt_path=None,
                  mse_loss_lambda=1,
                  identity_consistency_loss_lambda=0.05,
+                 identity_consistency_loss_source="image",
+                 spatial_consistency_loss_lambda=0.0,
+                 identity_consistency_loss_version= "simple_mean",
                  optimizer=torch.optim.AdamW,
+                 sampler=None,
                  *args, **kwargs
                  ):
 
@@ -34,12 +38,16 @@ class Trainer(pl.LightningModule):
         self.output_dir = output_dir
         self.mse_loss_lambda = mse_loss_lambda
         self.identity_consistency_loss_lambda = identity_consistency_loss_lambda
+        self.identity_consistency_loss_source = identity_consistency_loss_source
+        self.spatial_consistency_loss_lambda = spatial_consistency_loss_lambda
+        self.identity_consistency_loss_version = identity_consistency_loss_version
+        self.sampler = sampler
 
-        # self.noise_scheduler = DDPMScheduler(num_train_timesteps=sampler['num_train_timesteps'],
-        #                                      beta_start=sampler['beta_start'],
-        #                                      beta_end=sampler['beta_end'],
-        #                                      variance_type=sampler['variance_type'],
-        #                                      tensor_format="pt")
+        self.noise_scheduler = DDPMScheduler(num_train_timesteps=sampler['num_train_timesteps'],
+                                             beta_start=sampler['beta_start'],
+                                             beta_end=sampler['beta_end'],
+                                             variance_type=sampler['variance_type'],
+                                             tensor_format="pt")
 
         self.model = model_helper.make_unet(unet_config)
 

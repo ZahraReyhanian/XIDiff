@@ -51,6 +51,12 @@ id_ext_config = {
     }
 }
 
+sampler= {
+    "num_train_timesteps": 1000,
+    "beta_start": 0.0001,
+    "beta_end": 0.02,
+    "variance_type": "fixed_small"
+}
 
 def training(cfg):
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
@@ -76,7 +82,8 @@ def training(cfg):
                            id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
-                           identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"])
+                           identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
+                           sampler=sampler)
 
     print("Instantiating callbacks...")
     callbacks = create_list_of_callbacks(cfg["ckpt_path"])
@@ -114,7 +121,7 @@ def training(cfg):
     # load dataset
     # path = "D:/uni/Articles/codes/dataset/fer2013/"
     data_val = datasets.ImageFolder(f'{path}test', transform=transform)
-    val_loader = DataLoader(data_val, batch_size=1)
+    val_loader = DataLoader(data_val, batch_size=2)
 
     generate_image(model=model,
                    fake_image_path="generated_images",
