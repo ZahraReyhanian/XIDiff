@@ -50,6 +50,7 @@ class Trainer(pl.LightningModule):
                                              tensor_format="pt")
 
         self.model = model_helper.make_unet(unet_config)
+        print("device of model at the begining", self.model.device)
 
         self.ema_model = EMAModel(self.model, inv_gamma=1.0, power=3 / 4, max_value=0.9999)
         if 'gradient_checkpointing' in unet_config and unet_config['gradient_checkpointing']:

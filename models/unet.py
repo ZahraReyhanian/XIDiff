@@ -28,8 +28,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple, Union
 from torch import Tensor, device
 
-use_cuda = torch.cuda.is_available()
-norm_device = torch.device("cuda" if use_cuda else "cpu")
+norm_device = torch.device("cuda")
 
 class BaseOutput(OrderedDict):
     """
@@ -413,8 +412,10 @@ class AttentionBlock(nn.Module):
 
     def _forward(self, x, cross_attn=None):
         b, c, *spatial = x.shape
+        #x shape1 = 240, 512, 3, 3
         x = x.reshape(b, c, -1)
         qkv = self.qkv(self.norm(x))
+        #qkv shape=240
         cross_attn.to(x.device)
 
         if cross_attn is not None:

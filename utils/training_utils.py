@@ -223,25 +223,33 @@ def p_xt(xt, noise, t):
     xt_1 = mu + z * std
     return xt_1
 
-def generate_image(model, fake_image_path, im_size, dataloader, n_images):
+def generate_image(model, fake_image_path, im_size, dataloader, batch_size):
     n_steps = 1000
     # generate 100 samples
-    progress_bar = tqdm(n_steps, total=n_steps)
 
-    x = torch.randn(n_images, 3, im_size, im_size).cuda()  # Start with random noise
-    for i in range(n_steps):
 
-        timesteps = torch.randint(
-            n_steps-i-1, (n_images,), device=device
-        ).long().to(device)
-        with torch.no_grad():
-            batch = next(iter(dataloader))
-            print(batch)
-            encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
-            pred_noise = model.model(x.float(), timesteps, encoder_hidden_states=encoder_hidden_states).sample
-            x = p_xt(x, pred_noise, timesteps)
 
-            progress_bar.update(1)
-        # fake_images_tensor.append()
-    for i in range(n_images):
-        save_image(tensor=x[i], fp=f'{fake_image_path}/img_{i}.png')
+
+    with torch.no_grad():
+        for batch in dataloader:
+            progress_bar = tqdm(n_steps, total=n_steps)
+            for i in range(n_steps):
+                timesteps = torch.randint(
+                    n_steps - i, (batch_size,), device=device
+                ).long().to(device)
+
+                x = torch.randn(batch_size, 3, im_size, im_size).to(device)  # Start with random noise
+
+                encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
+
+                print("model device--------------------:" , model.model.device)
+                pred_noise = model.model(x, timesteps, encoder_hidden_states=encoder_hidden_states).sample
+
+                x = p_xt(x, pred_noise, timesteps)
+
+                progress_bar.update(1)
+
+            for j in range(batch_size):
+                save_image(tensor=x[j], fp=f'{fake_image_path}/img_{j}.png')
+
+            break

@@ -26,6 +26,7 @@ def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn):
         _name, _id = 'adaface_ir50_webface4m.ckpt', '1BmDRrhPsHSbXcWZoYFPJg2KJn1sd3QpN'
     else:
         raise NotImplementedError()
+    root = '/opt/data/reyhanian/'
     checkpoint_path = os.path.join(root, 'pretrained_models', _name)
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 
