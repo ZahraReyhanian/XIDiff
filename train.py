@@ -88,11 +88,11 @@ def training(cfg):
     print("Instantiating callbacks...")
     callbacks = create_list_of_callbacks(cfg["ckpt_path"])
 
-    print("Instantiating loggers...")
+    # print("Instantiating loggers...")
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=1)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=40)
 
     object_dict = {
         "cfg": cfg,
@@ -108,12 +108,10 @@ def training(cfg):
     #     break
     if cfg["training"]:
         print("Starting training...")
-        print("11111111111111111111111111111111", model.model.device)
         if cfg["ckpt_path"]:
             print('continuing from ', cfg["ckpt_path"])
 
         trainer.fit(model=model, datamodule=datamodule)
-        print("11111111111111111111111111111111", model.model.device)
 
     train_metrics = trainer.callback_metrics
 
@@ -128,9 +126,6 @@ def training(cfg):
     data_val = datasets.ImageFolder(f'{path}test', transform=transform)
     bs = 32
     val_loader = DataLoader(data_val, batch_size=bs)
-    print("22222222222222222222222222",model.model.device)
-    print("leeeeeeeeeen ",len(val_loader))
-    print("leeeeeeeeeen ",len(data_val))
 
     generate_image(model=model,
                    fake_image_path="generated_images",
