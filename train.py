@@ -79,6 +79,7 @@ def training(cfg):
     datamodule = FaceDataModule(dataset_path=path)
 
     model = MyModelTrainer(unet_config=unet_config,
+                           # ckpt_path=cfg["ckpt_path"],
                            id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
@@ -92,7 +93,7 @@ def training(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=40)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=10)
 
     object_dict = {
         "cfg": cfg,
@@ -103,15 +104,14 @@ def training(cfg):
         "trainer": trainer,
     }
 
-    # for batch in train_loader:
-    #     print(model.training_step(batch, 0))
-    #     break
+
     if cfg["training"]:
         print("Starting training...")
         if cfg["ckpt_path"]:
             print('continuing from ', cfg["ckpt_path"])
 
         trainer.fit(model=model, datamodule=datamodule)
+        trainer.save_checkpoint(f"{cfg['ckpt_path']}/final.ckpt")
 
     train_metrics = trainer.callback_metrics
 
@@ -122,15 +122,16 @@ def training(cfg):
     # path = "D:/uni/Articles/codes/dataset/fer2013/"
     print("cudaaaaaaaaaaaaa is available?!")
     print(torch.cuda.is_available())
+    model.eval()
     model.model = model.model.cuda()
-    data_val = datasets.ImageFolder(f'{path}test', transform=transform)
+    data_test = datasets.ImageFolder(f'{path}test', transform=transform)
     bs = 32
-    val_loader = DataLoader(data_val, batch_size=bs)
+    test_loader = DataLoader(data_test, batch_size=bs)
 
     generate_image(model=model,
                    fake_image_path="generated_images",
                    im_size=48,
-                   dataloader=val_loader,
+                   dataloader=test_loader,
                    batch_size=bs)
 
     #TODO test

@@ -176,13 +176,15 @@ class Trainer(pl.LightningModule):
         #
         # # self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
         # self.log_dict(loss_dict, prog_bar=True)
-
+        self.log('train_loss', loss, prog_bar=True)
         return loss
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx, stage='val'):
-        _, loss_dict = self.shared_step(batch, stage=stage)
+        loss, loss_dict = self.shared_step(batch, stage=stage)
         self.valid_loss_metric.update(loss_dict[f'{stage}/mse_loss'])
+        self.log('val_loss', loss, prog_bar=True)
+        return loss
 
     # def validation_epoch_end(self, outputs, stage='val', *args, **kwargs):
     #     # self.log('num_samples', self.num_samples)
