@@ -242,7 +242,6 @@ def generate_image(model, fake_image_path, im_size, dataloader, batch_size):
 
                 encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
 
-                print("model device--------------------:" , model.model.device)
                 pred_noise = model.model(x, timesteps, encoder_hidden_states=encoder_hidden_states).sample
 
                 x = p_xt(x, pred_noise, timesteps)

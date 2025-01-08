@@ -66,6 +66,8 @@ class Trainer(pl.LightningModule):
 
         if ckpt_path is not None:
             print('loading checkpoint in initalization from ', ckpt_path)
+            name = 'last.ckpt'
+            ckpt_path = os.path.join(ckpt_path, name)
             ckpt = torch.load(ckpt_path, map_location='cpu')['state_dict']
             model_statedict = {key[6:]: val for key, val in ckpt.items() if key.startswith('model.')}
             self.model.load_state_dict(model_statedict)
@@ -164,19 +166,13 @@ class Trainer(pl.LightningModule):
         raise ValueError('should not be here. Not Implemented')
 
     def training_step(self, batch, batch_idx):
-        # import cv2
-        # from src.general_utils.img_utils import tensor_to_numpy
-        # cv2.imwrite('/mckim/temp/temp3.png',tensor_to_numpy(batch['image'].cpu()[10])) # this is in rgb. so wrong color saved
-
         loss, loss_dict = self.shared_step(batch, stage='train')
         if self.ema_model.averaged_model.device != self.device:
             self.ema_model.averaged_model.to(self.device)
         self.ema_model.step(self.model)
-        # self.log("ema_decay", self.ema_model.decay, prog_bar=True, logger=True, on_step=True, on_epoch=False)
-        #
-        # # self.log_dict(loss_dict, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-        # self.log_dict(loss_dict, prog_bar=True)
-        self.log('train_loss', loss, prog_bar=True)
+        self.log("ema_decay", self.ema_model.decay, prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        self.log_dict(loss_dict, prog_bar=True)
+
         return loss
 
     @torch.no_grad()
@@ -186,12 +182,11 @@ class Trainer(pl.LightningModule):
         self.log('val_loss', loss, prog_bar=True)
         return loss
 
-    # def validation_epoch_end(self, outputs, stage='val', *args, **kwargs):
-    #     # self.log('num_samples', self.num_samples)
-    #     self.log('epoch', self.current_epoch)
-    #     self.log('global_step', self.global_step)
-    #     self.log(f'{stage}/mse_loss', self.valid_loss_metric.compute())
-    #     self.valid_loss_metric.reset()
+    def on_validation_epoch_end(self, stage = 'val', *args, **kwargs):
+        self.log('epoch', self.current_epoch)
+        self.log('global_step', self.global_step)
+        self.log(f'{stage}/mse_loss', self.valid_loss_metric.compute())
+        self.valid_loss_metric.reset()
 
     def on_train_batch_end(self, *args, **kwargs):
         pass
@@ -199,8 +194,8 @@ class Trainer(pl.LightningModule):
     def test_step(self, batch: Any, batch_idx: int):
         return self.validation_step(batch, batch_idx, stage='test')
 
-    def test_epoch_end(self, outputs: List[Any]):
-        return self.validation_epoch_end(outputs, stage='test')
+    def on_test_epoch_end(self, outputs: List[Any]):
+        return self.on_validation_epoch_end(stage='test')
 
     @property
     def x_T_size(self):
