@@ -21,6 +21,7 @@ class Trainer(pl.LightningModule):
                  id_ext_config=None,
                  output_dir=None,
                  ckpt_path=None,
+                 lr=0.001,
                  mse_loss_lambda=1,
                  identity_consistency_loss_lambda=0.05,
                  identity_consistency_loss_source="image",
@@ -34,6 +35,7 @@ class Trainer(pl.LightningModule):
         super(Trainer, self).__init__()
 
         self.optimizer = optimizer
+        self.lr = lr
         self.unet_config = unet_config
         self.output_dir = output_dir
         self.mse_loss_lambda = mse_loss_lambda
@@ -83,8 +85,7 @@ class Trainer(pl.LightningModule):
         return params
 
     def configure_optimizers(self):
-        opt = self.optimizer(params=self.get_parameters())
-        return [opt], []
+        return self.optimizer(params=self.get_parameters(), lr=self.lr)
 
     def load_state_dict(self, state_dict: 'OrderedDict[str, Tensor]', strict: bool = True):
         result = super(Trainer, self).load_state_dict(state_dict, strict=False)
@@ -137,7 +138,7 @@ class Trainer(pl.LightningModule):
 
 
 
-            #TODO extra identity_consistency_loss_lambda
+            #TODO add extra loss for expression
             if self.identity_consistency_loss_lambda > 0:
                 id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
                                                                        noisy_images=noisy_images, batch=batch,

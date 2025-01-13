@@ -79,7 +79,7 @@ def training(cfg):
     datamodule = FaceDataModule(dataset_path=path)
 
     model = MyModelTrainer(unet_config=unet_config,
-                           ckpt_path=cfg["ckpt_path"],
+                           # ckpt_path=cfg["ckpt_path"],
                            id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
@@ -93,7 +93,7 @@ def training(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=2)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=100)
 
     object_dict = {
         "cfg": cfg,
@@ -115,11 +115,29 @@ def training(cfg):
 
     train_metrics = trainer.callback_metrics
 
+    if cfg.get("test"):
+        print("Starting testing!")
+        if cfg.get("ckpt_path") and not cfg.get("train"):
+            print("Using predefined ckpt_path", cfg.get('ckpt_path'))
+            ckpt_path = cfg.get("ckpt_path")
+        elif cfg.get('trainer')['ckpt_path'] and not cfg.get("train"):
+            print('Model weight will be loaded during Making the Model')
+            ckpt_path = None
+        else:
+            ckpt_path = trainer.checkpoint_callback.best_model_path
+
+        if ckpt_path == "":
+            print("Best ckpt not found! Using current weights for testing...")
+            raise ValueError('')
+        trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
+        print(f"Best ckpt path: {ckpt_path}")
+
+    test_metrics = trainer.callback_metrics
+
     transform = transforms.Compose([transforms.Resize((48,48)),
                                     transforms.ToTensor()])
 
     # load dataset
-    # path = "D:/uni/Articles/codes/dataset/fer2013/"
     print("cudaaaaaaaaaaaaa is available?!")
     print(torch.cuda.is_available())
     model.eval()
@@ -134,29 +152,8 @@ def training(cfg):
                    dataloader=test_loader,
                    batch_size=bs)
 
-    #TODO test
-    # if cfg.get("test"):
-    #     print("Starting testing!")
-    #     if cfg.get("ckpt_path") and not cfg.get("train"):
-    #         print("Using predefined ckpt_path", cfg.get('ckpt_path'))
-    #         ckpt_path = cfg.get("ckpt_path")
-    #     elif cfg.get('trainer')['ckpt_path'] and not cfg.get("train"):
-    #         print('Model weight will be loaded during Making the Model')
-    #         ckpt_path = None
-    #     else:
-    #         ckpt_path = trainer.checkpoint_callback.best_model_path
-    #
-    #     if ckpt_path == "":
-    #         print("Best ckpt not found! Using current weights for testing...")
-    #         raise ValueError('')
-    #     trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
-    #     print(f"Best ckpt path: {ckpt_path}")
-    #
-    # test_metrics = trainer.callback_metrics
-
     # merge train and test metrics
-    metric_dict = {**train_metrics}
-        # , **test_metrics}
+    metric_dict = {**train_metrics, **test_metrics}
 
     return metric_dict, object_dict
 

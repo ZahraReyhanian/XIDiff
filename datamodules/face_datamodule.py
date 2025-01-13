@@ -35,7 +35,8 @@ class FaceDataModule(LightningDataModule):
 
             # load dataset
             self.data_train = datasets.ImageFolder(f'{self.dataset_path}train', transform=transform)
-            self.data_val = datasets.ImageFolder(f'{self.dataset_path}test', transform=transform)
+            self.data_val = datasets.ImageFolder(f'{self.dataset_path}valid', transform=transform)
+            self.data_test = datasets.ImageFolder(f'{self.dataset_path}test', transform=transform)
 
             print(self.data_train)
 
@@ -55,9 +56,9 @@ class FaceDataModule(LightningDataModule):
             num_workers=11
         )
 
-    # def test_dataloader(self):
-    #     return DataLoader(
-    #         dataset=self.data_test,
-    #         batch_size=self.batch_size,
-    #         shuffle=False,
-    #     )
+    def test_dataloader(self):
+        return DataLoader(
+            dataset=self.data_test,
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
