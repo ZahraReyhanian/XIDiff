@@ -80,6 +80,7 @@ def training(cfg):
 
     model = MyModelTrainer(unet_config=unet_config,
                            # ckpt_path=cfg["ckpt_path"],
+                           lr=cfg['lr'],
                            id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
@@ -143,8 +144,8 @@ def training(cfg):
     model.eval()
     model.model = model.model.cuda()
     data_test = datasets.ImageFolder(f'{path}test', transform=transform)
-    bs = 32
-    test_loader = DataLoader(data_test, batch_size=bs)
+    bs = 1
+    test_loader = DataLoader(data_test, batch_size=1)
 
     generate_image(model=model,
                    fake_image_path="generated_images",

@@ -225,12 +225,9 @@ def p_xt(xt, noise, t):
 
 def generate_image(model, fake_image_path, im_size, dataloader, batch_size):
     n_steps = 1000
-    # generate 100 samples
-
-
-
 
     with torch.no_grad():
+        it = 0
         for batch in dataloader:
             progress_bar = tqdm(n_steps, total=n_steps)
             for i in range(n_steps):
@@ -240,7 +237,7 @@ def generate_image(model, fake_image_path, im_size, dataloader, batch_size):
 
                 x = torch.randn(batch_size, 3, im_size, im_size).to(device)  # Start with random noise
 
-                encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
+                encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=batch_size)
 
                 pred_noise = model.model(x, timesteps, encoder_hidden_states=encoder_hidden_states).sample
 
@@ -248,7 +245,6 @@ def generate_image(model, fake_image_path, im_size, dataloader, batch_size):
 
                 progress_bar.update(1)
 
-            for j in range(batch_size):
-                save_image(tensor=x[j], fp=f'{fake_image_path}/img_{j}.png')
+            save_image(tensor=x[0], fp=f'{fake_image_path}/img_{it}.png')
+            it+=1
 
-            break
