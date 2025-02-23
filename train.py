@@ -12,8 +12,11 @@ from Trainer import Trainer as MyModelTrainer
 from utils import os_utils
 from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
-from utils.training_utils import generate_image
+from utils.generation_utils import generate_image
 from torchvision import datasets, transforms
+
+epochs=40
+n_steps=100
 
 unet_config = {
     "image_size": 112,
@@ -52,7 +55,7 @@ id_ext_config = {
 }
 
 sampler= {
-    "num_train_timesteps": 1000,
+    "num_train_timesteps": n_steps,
     "beta_start": 0.0001,
     "beta_end": 0.02,
     "variance_type": "fixed_small"
@@ -79,7 +82,7 @@ def training(cfg):
     datamodule = FaceDataModule(dataset_path=path)
 
     model = MyModelTrainer(unet_config=unet_config,
-                           # ckpt_path=cfg["ckpt_path"],
+                           ckpt_path=cfg["ckpt_path"],
                            lr=cfg['lr'],
                            id_ext_config= id_ext_config,
                            output_dir=cfg["output_dir"],
@@ -94,7 +97,7 @@ def training(cfg):
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=100)
+    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=epochs)
 
     object_dict = {
         "cfg": cfg,
@@ -146,12 +149,13 @@ def training(cfg):
     data_test = datasets.ImageFolder(f'{path}test', transform=transform)
     bs = 1
     test_loader = DataLoader(data_test, batch_size=1)
+    device = torch.device("cuda")
 
-    generate_image(model=model,
-                   fake_image_path="generated_images",
-                   im_size=48,
+    generate_image(pl_module=model,
+                   save_root="generated_images",
+                   batch_size=bs,
                    dataloader=test_loader,
-                   batch_size=bs)
+                   device=device)
 
     # merge train and test metrics
     metric_dict = {**train_metrics, **test_metrics}

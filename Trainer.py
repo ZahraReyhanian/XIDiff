@@ -1,17 +1,17 @@
 import os
 from typing import Any, List
 import pytorch_lightning as pl
-
+from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from torch.nn import functional as F
 from models.conditioner import make_condition
 from models import model_helper
 import torchmetrics
 from utils.training_utils import EMAModel
-from utils.training_utils import q_xt_x0
 from losses.consistency_loss import calc_identity_consistency_loss
 import torch
 from recognition.recognition_helper import make_id_extractor, RecognitionModel, make_recognition_model
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -44,12 +44,17 @@ class Trainer(pl.LightningModule):
         self.spatial_consistency_loss_lambda = spatial_consistency_loss_lambda
         self.identity_consistency_loss_version = identity_consistency_loss_version
         self.sampler = sampler
+        self.n_steps = sampler['num_train_timesteps']
 
         self.noise_scheduler = DDPMScheduler(num_train_timesteps=sampler['num_train_timesteps'],
                                              beta_start=sampler['beta_start'],
                                              beta_end=sampler['beta_end'],
                                              variance_type=sampler['variance_type'],
                                              tensor_format="pt")
+        self.noise_scheduler_ddim = DDIMScheduler(num_train_timesteps=sampler['num_train_timesteps'],
+                                                  beta_start=sampler['beta_start'],
+                                                  beta_end=sampler['beta_end'],
+                                                  tensor_format="pt")
 
         self.model = model_helper.make_unet(unet_config)
         print("device of model at the begining", self.model.device)
@@ -97,6 +102,7 @@ class Trainer(pl.LightningModule):
             print(result.unexpected_keys)
         return result
 
+    @rank_zero_only
     def on_train_start(self):
         # by default lightning executes validation step sanity checks before training starts,
         # so we need to make sure val_acc_best doesn't store accuracy from these checks
@@ -104,28 +110,28 @@ class Trainer(pl.LightningModule):
             # one time copy of project files
             os.makedirs(self.output_dir, exist_ok=True)
 
+    @rank_zero_only
     @torch.no_grad()
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx=0):
         pass
 
-    def shared_step(self, batch, stage='train', optimizer_idx=0, n_steps=1000, *args, **kwargs):
+    def shared_step(self, batch, stage='train', optimizer_idx=0, *args, **kwargs):
         clean_images = batch[0]
 
         bsz = clean_images.shape[0]
+        noise = torch.randn(clean_images.shape).to(clean_images.device)
 
         # Sample a random timestep for each image
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda" if use_cuda else "cpu")
 
-        timesteps = torch.randint(
-            0, n_steps, (bsz,), device=clean_images.device
-        ).long().to(device)
+        timesteps = torch.randint(0, self.n_steps, (bsz,)).long().to(device)
 
         loss_dict = {}
         total_loss = 0.0
 
         if optimizer_idx == 0:
-            noisy_images, noise = q_xt_x0(clean_images, timesteps)
+            noisy_images = self.noise_scheduler.add_noise(clean_images, noise, timesteps)
             encoder_hidden_states = self.get_encoder_hidden_states(batch, batch_size=None)
             noise_pred = self.model(noisy_images, timesteps, encoder_hidden_states=encoder_hidden_states).sample
             mse_loss = F.mse_loss(noise_pred, noise)

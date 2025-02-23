@@ -9,6 +9,8 @@ from functools import partial
 from pytorch_lightning.utilities import rank_zero_only
 from torchvision.utils import save_image
 from tqdm import tqdm
+import warnings
+from typing import Optional, Tuple, Union
 
 torch.cuda.empty_cache()
 # Set up some parameters
@@ -63,24 +65,6 @@ def gather(consts: torch.Tensor, t: torch.Tensor):
     c = consts.gather(-1, t.to(device))
     return c.reshape(-1, 1, 1, 1)
 
-
-n_steps = 1000
-beta = torch.linspace(0.0001, 0.04, n_steps, device=device)
-alpha = 1. - beta
-alpha_bar = torch.cumprod(alpha, dim=0)
-
-
-# return the noise itself as well
-def q_xt_x0(x0, t):
-    alpha_bar_t = gather(alpha_bar, t.to(device))
-    mean = (alpha_bar_t).sqrt()*x0.to(device)
-
-    std = (1-alpha_bar_t).sqrt()
-    noise = torch.randn_like(x0).to(device)
-
-    x_t = mean + std * noise
-
-    return x_t, noise
 
 def disabled_train(mode=True, self=None):
     """Overwrite model.train with this function to make sure train/eval mode
@@ -208,43 +192,34 @@ class EMAModel(nn.Module):
         self.averaged_model.load_state_dict(ema_state_dict, strict=False)
         self.optimization_step += 1
 
-
-def p_xt(xt, noise, t):
-    # reverse step
-    alpha_t = gather(alpha, t)
-    alpha_bar_t = gather(alpha_bar, t)
-    beta_t = gather(beta, t)
-
-    eps_coef = (1 - alpha_t) / torch.sqrt(1 - alpha_bar_t)
-    mu = (xt - eps_coef * noise) / (torch.sqrt(alpha_t))
-    z = torch.randn_like(xt)
-    std = torch.sqrt(beta_t)
-
-    xt_1 = mu + z * std
-    return xt_1
-
-def generate_image(model, fake_image_path, im_size, dataloader, batch_size):
-    n_steps = 1000
-
-    with torch.no_grad():
-        it = 0
-        for batch in dataloader:
-            progress_bar = tqdm(n_steps, total=n_steps)
-            for i in range(n_steps):
-                timesteps = torch.randint(
-                    n_steps - i, (batch_size,), device=device
-                ).long().to(device)
-
-                x = torch.randn(batch_size, 3, im_size, im_size).to(device)  # Start with random noise
-
-                encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=batch_size)
-
-                pred_noise = model.model(x, timesteps, encoder_hidden_states=encoder_hidden_states).sample
-
-                x = p_xt(x, pred_noise, timesteps)
-
-                progress_bar.update(1)
-
-            save_image(tensor=x[0], fp=f'{fake_image_path}/img_{it}.png')
-            it+=1
-
+# def generate_image(model, fake_image_path, im_size, dataloader, batch_size, n_steps, device, generator: Optional[torch.Generator] = None,):
+#
+#     with torch.no_grad():
+#         it = 0
+#         for batch in dataloader:
+#             print("image: ", it)
+#             noise = torch.randn(batch[0].shape).to(device)
+#             timesteps = torch.randint(
+#                 0, n_steps, (batch_size,), device=device
+#             ).long().to(device)
+#             clean_image = batch[0].to(device)
+#             image = model.noise_scheduler.add_noise(clean_image, noise, timesteps)
+#             image = image.to(device)
+#
+#             # set step values
+#             model.noise_scheduler.set_timesteps(n_steps)
+#
+#             for t in tqdm(model.noise_scheduler.timesteps):
+#                 # 1. predict noise model_output
+#                 t = t.to(device)
+#                 encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
+#                 model_output = model.model(image, t, encoder_hidden_states=encoder_hidden_states).sample
+#
+#                 # 2. compute previous image: x_t -> x_t-1
+#                 image = model.noise_scheduler.step(model_output, t, image, generator=generator).prev_sample
+#
+#             image = (image / 2 + 0.5).clamp(0, 1)
+#             image = image.cpu()
+#             save_image(tensor=image, fp=f'{fake_image_path}/img_{it}.png')
+#             it+=1
+#
