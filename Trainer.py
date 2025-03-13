@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from torch.nn import functional as F
 from models.conditioner import make_condition
+from recognition.external_mapping import make_external_mapping
 from models import model_helper
 import torchmetrics
 from utils.training_utils import EMAModel
@@ -12,6 +13,7 @@ import torch
 from recognition.recognition_helper import make_id_extractor, RecognitionModel, make_recognition_model
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
+from utils.os_utils import get_latest_file
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -19,6 +21,7 @@ class Trainer(pl.LightningModule):
     def __init__(self,
                  unet_config=None,
                  id_ext_config=None,
+                 external_mapping=None,
                  output_dir=None,
                  ckpt_path=None,
                  lr=0.001,
@@ -29,6 +32,7 @@ class Trainer(pl.LightningModule):
                  identity_consistency_loss_version= "simple_mean",
                  optimizer=torch.optim.AdamW,
                  sampler=None,
+                 use_ema=True,
                  *args, **kwargs
                  ):
 
@@ -45,6 +49,7 @@ class Trainer(pl.LightningModule):
         self.identity_consistency_loss_version = identity_consistency_loss_version
         self.sampler = sampler
         self.n_steps = sampler['num_train_timesteps']
+        self.use_ema = use_ema
 
         self.noise_scheduler = DDPMScheduler(num_train_timesteps=sampler['num_train_timesteps'],
                                              beta_start=sampler['beta_start'],
@@ -63,17 +68,26 @@ class Trainer(pl.LightningModule):
         if 'gradient_checkpointing' in unet_config and unet_config['gradient_checkpointing']:
             self.model.enable_gradient_checkpointing()
 
+        # enable training
+        print("make recognition model")
+        self.recognition_model: RecognitionModel = make_recognition_model(id_ext_config["recognition_config"],
+                                                                          enable_training=True)
+        self.recognition_model_eval = self.recognition_model
+
         self.valid_loss_metric = torchmetrics.MeanMetric()
+
+        print("make_id_extractor")
         self.id_extractor = make_id_extractor(id_ext_config, unet_config)
 
-        # disabled training
-        self.recognition_model: RecognitionModel = make_recognition_model(id_ext_config["recognition_config"])
-        self.recognition_model_eval = self.recognition_model
+        print("make_external_mapping")
+        self.external_mapping = make_external_mapping(external_mapping, unet_config)
+
 
 
         if ckpt_path is not None:
-            print('loading checkpoint in initalization from ', ckpt_path)
-            name = 'last.ckpt'
+            print('loading checkpoint in initalization from ', ckpt_path, '...............')
+            name = get_latest_file(ckpt_path)
+            print(name)
             ckpt_path = os.path.join(ckpt_path, name)
             ckpt = torch.load(ckpt_path, map_location='cpu')['state_dict']
             model_statedict = {key[6:]: val for key, val in ckpt.items() if key.startswith('model.')}
@@ -87,6 +101,8 @@ class Trainer(pl.LightningModule):
             params = list(self.model.parameters())
         if self.id_extractor is not None:
             params = params + list(self.id_extractor.parameters())
+        if self.external_mapping is not None:
+            params = params + list(self.external_mapping.parameters())
         return params
 
     def configure_optimizers(self):
@@ -186,13 +202,13 @@ class Trainer(pl.LightningModule):
     def validation_step(self, batch, batch_idx, stage='val'):
         loss, loss_dict = self.shared_step(batch, stage=stage)
         self.valid_loss_metric.update(loss_dict[f'{stage}/mse_loss'])
-        self.log('val_loss', loss, prog_bar=True)
+        self.log('val_loss', loss, prog_bar=True, sync_dist=True)
         return loss
 
     def on_validation_epoch_end(self, stage = 'val', *args, **kwargs):
-        self.log('epoch', self.current_epoch)
-        self.log('global_step', self.global_step)
-        self.log(f'{stage}/mse_loss', self.valid_loss_metric.compute())
+        self.log('epoch', self.current_epoch, sync_dist=True)
+        self.log('global_step', self.global_step, sync_dist=True)
+        self.log(f'{stage}/mse_loss', self.valid_loss_metric.compute(), sync_dist=True)
         self.valid_loss_metric.reset()
 
     def on_train_batch_end(self, *args, **kwargs):

@@ -6,23 +6,17 @@ def make_condition(pl_module, batch):
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
 
     id_feat, id_cross_att = pl_module.id_extractor(batch[0])
-    id_cross_att = torch.cat([id_feat.unsqueeze(1), id_cross_att], dim=1)
+
     _, spatial = pl_module.recognition_model(batch[0].to(pl_module.device))
-    # ext_mapping = pl_module.external_mapping(spatial)
-    cross_attn = id_cross_att.transpose(1,2)
-    result['cross_attn'] = pl_module.id_extractor.cross_attn_adapter(cross_attn)
-    # result['stylemod'] = ext_mapping
+    ext_mapping = pl_module.external_mapping(spatial)
+    cross_attn = torch.cat([id_cross_att, ext_mapping], dim=1).transpose(1,2)
+    result['cross_attn'] = pl_module.external_mapping.cross_attn_adapter(cross_attn)
+    result['stylemod'] = id_feat
 
     class_label = batch[1].to(pl_module.device)
+    center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
 
-    if pl_module.recognition_model.center!=None:
-        center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
-
-
-        if center_emb.shape[1] == 1:
-            center_emb = center_emb.squeeze(1)
-
-        result['center_emb'] = center_emb
+    result['center_emb'] = center_emb
 
     return result
 
@@ -32,21 +26,29 @@ def mix_hidden_states(encoder_hidden_states, mixing_hidden_states,
 
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
     condition_type = 'crossatt_and_stylemod'
-    condition_source = 'image_and_patchstat_spatial'
+    condition_source = 'patchstat_spatial_and_image'
     source_label, source_spatial = split_label_spatial(condition_type, condition_source, encoder_hidden_states, pl_module)
     mixing_label, mixing_spatial = split_label_spatial(condition_type, condition_source, mixing_hidden_states, pl_module)
 
-    mixed_label = source_alpha * source_label + (1-source_alpha) * mixing_label
-    mixed_cross_attn = mixed_label
+    source_label_feat, source_label_spat = source_label
+    mixing_label_feat, mixing_label_spat = mixing_label
+
+    ##########
+    mixed_label_spat = source_alpha * source_label_spat + (1 - source_alpha) * mixing_label_spat
+    mixed_label_feat = source_alpha * source_label_feat + (1 - source_alpha) * mixing_label_feat
+    mixed_cross_attn = torch.cat([mixed_label_spat, source_spatial], dim=2)
+    mixed_stylemod = mixed_label_feat
 
     result['cross_attn'] = mixed_cross_attn
-
-
+    result['stylemod'] = mixed_stylemod
     source_class_emb = encoder_hidden_states['center_emb']
     mixing_class_emb = mixing_hidden_states['center_emb']
 
-    mixed_class_emb = source_alpha * source_class_emb + (1-source_alpha) * mixing_class_emb
-    mixed_class_emb = mixed_class_emb / torch.norm(mixed_class_emb, 2, -1, keepdim=True)
+    if 'spatial' in mixing_method:
+        mixed_class_emb = source_class_emb
+    else:
+        mixed_class_emb = source_alpha * source_class_emb + (1 - source_alpha) * mixing_class_emb
+        mixed_class_emb = mixed_class_emb / torch.norm(mixed_class_emb, 2, -1, keepdim=True)
     result['center_emb'] = mixed_class_emb
     return result
 

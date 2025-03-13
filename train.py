@@ -15,7 +15,7 @@ from datamodules.face_datamodule import FaceDataModule
 from utils.generation_utils import generate_image
 from torchvision import datasets, transforms
 
-epochs=40
+epochs=10
 n_steps=100
 
 unet_config = {
@@ -35,7 +35,9 @@ unet_config = {
     "resblock_updown": True,
     "use_fp16": False,
     "use_new_attention_order": False,
-    "freeze_unet": False
+    "freeze_unet": False,
+    "condition_type": 'crossatt_and_stylemod',
+    "condition_source": 'patchstat_spatial_and_image'
 }
 
 id_ext_config = {
@@ -48,9 +50,9 @@ id_ext_config = {
         "normalize_feature": False,
         "return_spatial": [2],
         "head_name": 'none',
-        "backbone": "ir_50",
-        "ckpt_path": '/pretrained_models/adaface_ir50_webface4m.ckpt',
-        # "center_path": '/pretrained_models/center_ir_50_adaface_webface4m_faces_webface_112x112.pth'
+        "backbone": "ir_101",
+        "ckpt_path": '/opt/data/reyhanian/pretrained_models/adaface_ir101_webface4m.ckpt',
+        "center_path": '/opt/data/reyhanian/pretrained_models/center_ir_101_adaface_webface4m_faces_webface_112x112.pth'
     }
 }
 
@@ -59,6 +61,14 @@ sampler= {
     "beta_start": 0.0001,
     "beta_end": 0.02,
     "variance_type": "fixed_small"
+}
+
+external_mapping= {
+    "version": "v4_dropout",
+    "return_spatial": [2],
+    "spatial_dim": 5,
+    "out_channel": 512,
+    "dropout_prob": 0.3
 }
 
 def training(cfg):
@@ -79,12 +89,13 @@ def training(cfg):
     pl.seed_everything(cfg["seed"], workers=True)
     path = cfg["dataset_path"]
 
-    datamodule = FaceDataModule(dataset_path=path)
+    datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]), batch_size=cfg["batch_size"])
 
     model = MyModelTrainer(unet_config=unet_config,
-                           ckpt_path=cfg["ckpt_path"],
+                           # ckpt_path=cfg["ckpt_path"],
                            lr=cfg['lr'],
                            id_ext_config= id_ext_config,
+                           external_mapping=external_mapping,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],

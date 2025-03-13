@@ -3,6 +3,11 @@ import shutil
 import re
 from time import gmtime, strftime
 
+def get_latest_file(directory):
+    files = [os.path.join(directory, f) for f in os.listdir(directory)]
+    latest_file = max(files, key=os.path.getmtime)
+    return latest_file
+
 def get_all_files(root, extension_list=['.csv'], sorted=False):
 
     all_files = list()

@@ -18,6 +18,8 @@ def create_model(
         resblock_updown=False,
         use_fp16=False,
         use_new_attention_order=False,
+        condition_type=None,
+        condition_source=None,
         freeze_unet=False
 ):
     if channel_mult == "":

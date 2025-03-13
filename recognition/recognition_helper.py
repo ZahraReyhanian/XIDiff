@@ -160,7 +160,6 @@ class RecognitionModel(nn.Module):
             x = orig_images
 
         elif x.shape[2] != self.size or x.shape[3] != self.size:
-            # print('why is this happening?')
             quantized_x = self.quantize_images(x)
             x = self.resize_and_normalize(quantized_x, device=x.device)
 
@@ -272,7 +271,8 @@ def make_id_extractor(config, unet_config):
         config["recognition_config"] = copy.copy(config["recognition_config"])
         config["recognition_config"]['ckpt_path'] = None
         config["recognition_config"]['center_path'] = None
-        config["recognition_config"]['return_spatial'] = [21]
+        config["recognition_config"]['return_spatial'] = [46]
+        #21
         model = make_recognition_model(config["recognition_config"], enable_training=True)
         label_mapping = ImageEmbedder(backbone=model)
         out = label_mapping.forward(torch.randn(3,3,112,112))

@@ -50,6 +50,7 @@ class DDIMPipeline(DiffusionPipeline):
         return_dict: bool = True,
         encoder_hidden_states=None,
         return_x0_intermediates=False,
+        image=None,
         **kwargs,
     ) -> Union[ImagePipelineOutput, Tuple]:
         r"""
@@ -91,10 +92,11 @@ class DDIMPipeline(DiffusionPipeline):
         # eta corresponds to η in paper and should be between [0, 1]
 
         # Sample gaussian noise to begin loop
-        image = torch.randn(
-            (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
-            generator=generator,
-        )
+        if image is None:
+            image = torch.randn(
+                (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
+                generator=generator,
+            )
         image = image.to(self.device)
 
         # set step values
