@@ -107,7 +107,7 @@ def training(cfg):
     # print("Instantiating loggers...")
     # logger = WandbLogger(project=cfg["project_task"], log_model='all', id= cfg["id"], save_dir=cfg["output_dir"],)
     print("before train.....................................................................")
-    strategy = DDPStrategy(find_unused_parameters=False)
+    strategy = DDPStrategy(find_unused_parameters=True)
     trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks, strategy=strategy, max_epochs=epochs)
 
     object_dict = {
