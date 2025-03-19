@@ -171,9 +171,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     """
 
     def forward(self, x, emb, cross_attn=None, stylemod=None):
-        # x.device = cuda
         for layer in self:
-            layer.to(x.device)
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
             elif isinstance(layer, AttentionBlock):
@@ -412,11 +410,9 @@ class AttentionBlock(nn.Module):
 
     def _forward(self, x, cross_attn=None):
         b, c, *spatial = x.shape
-        #x shape1 = 240, 512, 3, 3
         x = x.reshape(b, c, -1)
         qkv = self.qkv(self.norm(x))
-        #qkv shape=240
-        cross_attn.to(x.device)
+
 
         if cross_attn is not None:
             h = self.attention(qkv, cross_attn)
@@ -574,12 +570,23 @@ class UNetModel(nn.Module):
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
+        condition_type=None,
+        cross_attn_dim=None
     ):
         super().__init__()
 
         if num_heads_upsample == -1:
             num_heads_upsample = num_heads
 
+        self.condition_type = condition_type
+        if self.condition_type in ['crossatt_and_stylemod', 'cross_attn']:
+            if cross_attn_dim == 512:
+                cross_attn_encoder_channels = None
+            else:
+                raise ValueError('') # if you allow this, you have to train the main model. safety check
+                cross_attn_encoder_channels = cross_attn_dim
+        else:
+            cross_attn_encoder_channels = None
 
         self.image_size = image_size
         self.sample_size = image_size
@@ -616,8 +623,6 @@ class UNetModel(nn.Module):
         input_block_chans = [ch]
         ds = 1
         skip_downsample_level = 4
-        cross_attn_encoder_channels = None
-
         for level, mult in enumerate(channel_mult):
             for _ in range(num_res_blocks):
                 layers = [
@@ -795,22 +800,27 @@ class UNetModel(nn.Module):
             assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
 
-        #TODO check
-        cross_attn = encoder_hidden_states['cross_attn']
-        cross_attn.to(x.device)
-        stylemod = None
-        # emb = emb + stylemod
+        if self.condition_type == 'crossatt_and_stylemod':
+            cross_attn = encoder_hidden_states['cross_attn'].to(emb.device)
+            stylemod = encoder_hidden_states['stylemod'].to(emb.device)
+            emb = emb + stylemod
+        elif self.condition_type == 'cross_attn':
+            cross_attn = encoder_hidden_states['cross_attn']
+            stylemod = None
+        else:
+            assert self.condition_type is None
+            cross_attn = None
+            stylemod = None
 
 
         h = x.type(self.dtype)
-
+        # print(h.shape)
         for module in self.input_blocks:
-            # print(h.device)
             h = module(h, emb, cross_attn=cross_attn, stylemod=stylemod)
-
+            # print(h.shape)
             hs.append(h)
         h = self.middle_block(h, emb, cross_attn=cross_attn, stylemod=stylemod)
-
+        # print(h.shape)
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
             # print(h.shape)

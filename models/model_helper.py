@@ -19,9 +19,10 @@ def create_model(
         use_fp16=False,
         use_new_attention_order=False,
         condition_type=None,
+        cross_attn_dim=None,
         condition_source=None,
         freeze_unet=False
-):
+    ):
     if channel_mult == "":
         if image_size == 512:
             channel_mult = (0.5, 1, 1, 2, 2, 4, 4)
@@ -60,6 +61,8 @@ def create_model(
         use_scale_shift_norm=use_scale_shift_norm,
         resblock_updown=resblock_updown,
         use_new_attention_order=use_new_attention_order,
+        condition_type=condition_type,
+        cross_attn_dim=cross_attn_dim
     ).cuda()
 
 

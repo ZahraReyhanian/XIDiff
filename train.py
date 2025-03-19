@@ -15,7 +15,7 @@ from datamodules.face_datamodule import FaceDataModule
 from utils.generation_utils import generate_image
 from torchvision import datasets, transforms
 
-epochs=10
+epochs=50
 n_steps=100
 
 unet_config = {
@@ -37,7 +37,8 @@ unet_config = {
     "use_new_attention_order": False,
     "freeze_unet": False,
     "condition_type": 'crossatt_and_stylemod',
-    "condition_source": 'patchstat_spatial_and_image'
+    "condition_source": 'patchstat_spatial_and_image',
+    "cross_attn_dim": 512
 }
 
 id_ext_config = {

@@ -9,7 +9,7 @@
 # !pip install --upgrade torch torchvision torchaudio
 
 #@title imports and utility functions
-from datasets import load_dataset
+# from datasets import load_dataset
 from PIL import Image
 import torch.nn.functional as F
 import os
@@ -17,7 +17,7 @@ from tqdm import tqdm
 import torch
 import numpy as np
 from torchvision import datasets, transforms
-from torchvision.datasets.utils import download_url
+# from torchvision.datasets.utils import download_url
 
 
 def img_to_tensor(im):
@@ -33,14 +33,15 @@ def gather(consts: torch.Tensor, t: torch.Tensor):
 
 # 2.1 Dataset
 
-im_size = 48
+im_size = 112
 transform = transforms.Compose([transforms.Resize((im_size, im_size)),
                                  transforms.ToTensor()])
 
 # load dataset
-train = datasets.ImageFolder('data/train', transform=transform)
-valid = datasets.ImageFolder('data/valid', transform=transform)
-test = datasets.ImageFolder('data/test', transform=transform)
+PATH = '/opt/data/reyhanian/data/affectnet'
+train = datasets.ImageFolder(f'{PATH}/train', transform=transform)
+valid = datasets.ImageFolder(f'{PATH}/valid', transform=transform)
+test = datasets.ImageFolder(f'{PATH}/test', transform=transform)
 
 
 ## 2.2 Adding Noise
@@ -512,7 +513,7 @@ unet = UNet(n_channels=n_channels).cuda()
 # Training params
 lr = 1e-4 # Explore this - might want it lower when training on the full dataset
 
-epochs = 100
+epochs = 70
 optimizer = torch.optim.AdamW(unet.parameters(), lr=lr) # Optimizer
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.8) #learning rate scheduler
 denoising_loss = F.mse_loss #use mean squared error fuction to calculate loss
@@ -527,7 +528,7 @@ prev_loss = 1000000
 
 for epoch in range(epochs):
     #train step
-    unet.training()
+    unet.train()
     train_loss = 0
 
     #number of iteration
@@ -598,16 +599,16 @@ for epoch in range(epochs):
 
 """## plot train and validation loss"""
 
-import matplotlib.pyplot as plt
-
-plt.plot(range(epochs), losses, label="Train loss")
-plt.plot(range(epochs), val_losses, label="Validation loss")
-plt.ylabel("loss/error")
-plt.xlabel('Epochs')
-plt.title("Train and valid loss during training")
-plt.legend()
-plt.show()
-plt.savefig('training.png')
+# import matplotlib.pyplot as plt
+#
+# plt.plot(range(epochs), losses, label="Train loss")
+# plt.plot(range(epochs), val_losses, label="Validation loss")
+# plt.ylabel("loss/error")
+# plt.xlabel('Epochs')
+# plt.title("Train and valid loss during training")
+# plt.legend()
+# plt.show()
+# plt.savefig('training.png')
 
 
 """### save model"""

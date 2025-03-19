@@ -24,7 +24,7 @@ def generate_image(pl_module, dataloader, device, batch_size=1, num_workers=0, s
             save_path = os.path.join(save_root, save_name)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-            image = image.reshape(3,48,48)
+            image = image.reshape(3,112,112)
             image = torch.from_numpy(image.copy())
             save_image(tensor=image, fp=save_path)
 
@@ -91,7 +91,8 @@ def render_condition(batch, pl_module, batch_size=1, between_zero_and_one=True, 
                            num_inference_steps=50, eta=1.0, use_clipped_model_output=False,
                            encoder_hidden_states=encoder_hidden_states,
                            return_x0_intermediates=return_x0_intermediates,
-                           image=noisy_images)
+                           # image=noisy_images
+                           )
     pred_images = pred_result.images
     pred_images = np.clip(pred_images, 0, 1)
     if not between_zero_and_one:
