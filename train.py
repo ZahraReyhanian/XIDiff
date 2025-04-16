@@ -7,61 +7,90 @@ import pytorch_lightning as pl
 from pytorch_lightning.strategies.ddp import DDPStrategy
 # from pytorch_lightning.loggers.wandb import WandbLogger
 # from utils.training_utils import log_hyperparameters
-from torch.utils.data import DataLoader
 from Trainer import Trainer as MyModelTrainer
 from utils import os_utils
 from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
-from utils.generation_utils import generate_image
-from torchvision import datasets, transforms
 
-epochs=50
-n_steps=100
+
+epochs=100
+n_steps=1000
 
 unet_config = {
-    "image_size": 112,
-    "num_channels": 128,
-    "num_res_blocks": 1,
-    "channel_mult": '',
-    "learn_sigma": True,
-    "class_cond": False,
-    "use_checkpoint": False,
-    "attention_resolutions": "16",
-    "num_heads": 4,
-    "num_head_channels": 64,
-    "num_heads_upsample": -1,
-    "use_scale_shift_norm": True,
-    "dropout": 0.0,
-    "resblock_updown": True,
-    "use_fp16": False,
-    "use_new_attention_order": False,
     "freeze_unet": False,
-    "condition_type": 'crossatt_and_stylemod',
-    "condition_source": 'patchstat_spatial_and_image',
-    "cross_attn_dim": 512
+    'model_params':
+            {"image_size": 112,
+             "num_channels": 128,
+             "num_res_blocks": 1,
+             "channel_mult": '',
+             "learn_sigma": True,
+             "class_cond": False,
+             "use_checkpoint": False,
+             "attention_resolutions": "16",
+             "num_heads": 4,
+             "num_head_channels": 64,
+             "num_heads_upsample": -1,
+             "use_scale_shift_norm": True,
+             "dropout": 0.0,
+             "resblock_updown": True,
+             "use_fp16": False,
+             "use_new_attention_order": False
+             },
+    'params':
+        {"gradient_checkpointing": True,
+         "condition_type": 'crossatt_and_stylemod',
+         "condition_source": 'patchstat_spatial_and_image',
+         "cross_attention_dim'": 512,
+         'image_size': 112,
+         'in_channels': 3,
+         'out_channels': 3,
+         'pretrained_model_path': '/opt/data/reyhanian/pretrained_models/ffhq_10m.pt'}
 }
 
-id_ext_config = {
-    "version": "v4",
-    "out_channel": 256,
-    "num_latent": 8,
-    "recognition_config":{
-        "dataset": "webface4m",
-        "loss_fn": "adaface",
-        "normalize_feature": False,
-        "return_spatial": [2],
-        "head_name": 'none',
-        "backbone": "ir_101",
-        "ckpt_path": '/opt/data/reyhanian/pretrained_models/adaface_ir101_webface4m.ckpt',
-        "center_path": '/opt/data/reyhanian/pretrained_models/center_ir_101_adaface_webface4m_faces_webface_112x112.pth'
-    }
+
+
+label_mapping = {
+    'version': 'v4', 'out_channel': 256, 'num_latent': 8,
+        'recognition_config':
+            {'backbone': 'ir_50',
+            'dataset': 'webface4m',
+            'loss_fn': 'adaface',
+            'normalize_feature': False,
+            'return_spatial': [21],
+            'head_name': 'none',
+            'ckpt_path': None,
+            'center_path': None}
 }
+
+recognition = {
+    'backbone': 'ir_50',
+    'dataset': 'webface4m',
+    'loss_fn': 'adaface',
+    'normalize_feature': False,
+    'return_spatial': [2],
+    'head_name': 'none',
+    'ckpt_path': '/opt/data/reyhanian/pretrained_models/adaface_ir50_casia.ckpt',
+    'center_path': '/opt/data/reyhanian/pretrained_models/center_ir_50_adaface_casia_faces_webface_112x112.pth'
+}
+
+
+recognition_eval ={
+    'backbone': 'ir_101',
+    'dataset': 'webface4m',
+    'loss_fn': 'adaface',
+    'normalize_feature': False,
+    'return_spatial': [2],
+    'head_name': 'none',
+    'ckpt_path': None,
+    'center_path': '/opt/data/reyhanian/pretrained_models/center_ir_101_adaface_webface4m_faces_webface_112x112.pth'
+}
+
 
 sampler= {
     "num_train_timesteps": n_steps,
     "beta_start": 0.0001,
     "beta_end": 0.02,
-    "variance_type": "fixed_small"
+    "variance_type": "learned_range"
 }
 
 external_mapping= {
@@ -95,7 +124,9 @@ def training(cfg):
     model = MyModelTrainer(unet_config=unet_config,
                            # ckpt_path=cfg["ckpt_path"],
                            lr=cfg['lr'],
-                           id_ext_config= id_ext_config,
+                           recognition=recognition,
+                           recognition_eval=recognition_eval,
+                           label_mapping= label_mapping,
                            external_mapping=external_mapping,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
@@ -149,25 +180,6 @@ def training(cfg):
         print(f"Best ckpt path: {ckpt_path}")
 
     test_metrics = trainer.callback_metrics
-
-    transform = transforms.Compose([transforms.Resize((48,48)),
-                                    transforms.ToTensor()])
-
-    # load dataset
-    print("cudaaaaaaaaaaaaa is available?!")
-    print(torch.cuda.is_available())
-    model.eval()
-    model.model = model.model.cuda()
-    data_test = datasets.ImageFolder(f'{path}test', transform=transform)
-    bs = 1
-    test_loader = DataLoader(data_test, batch_size=1)
-    device = torch.device("cuda")
-
-    generate_image(pl_module=model,
-                   save_root="generated_images",
-                   batch_size=bs,
-                   dataloader=test_loader,
-                   device=device)
 
     # merge train and test metrics
     metric_dict = {**train_metrics, **test_metrics}

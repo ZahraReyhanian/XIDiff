@@ -19,9 +19,7 @@ def create_model(
         use_fp16=False,
         use_new_attention_order=False,
         condition_type=None,
-        cross_attn_dim=None,
-        condition_source=None,
-        freeze_unet=False
+        cross_attn_dim=None
     ):
     if channel_mult == "":
         if image_size == 512:
@@ -68,9 +66,12 @@ def create_model(
 
 
 def make_unet(unet_config):
-    model: UNetModel = create_model(**unet_config)
+    model: UNetModel = create_model(**unet_config["model_params"],
+                                    condition_type=unet_config['params']['condition_type'],
+                                    cross_attn_dim=unet_config['params']['cross_attention_dim']
+                                    )
     if unet_config.get("pretrained_model_path"):
         print('loading model from {}'.format(unet_config["pretrained_model_path"]))
-        statedict = torch.load(unet_config["pretrained_model_path"], map_location='cpu')
+        statedict = torch.load(unet_config["pretrained_model_path"], map_location='cuda')
         res = model.load_state_dict(statedict, strict=True)
     return model

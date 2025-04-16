@@ -5,9 +5,10 @@ def make_condition(pl_module, batch):
 
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
 
+    print(batch[0].device)
     id_feat, id_cross_att = pl_module.id_extractor(batch[0])
 
-    _, spatial = pl_module.recognition_model(batch[0].to(pl_module.device))
+    _, spatial = pl_module.recognition_model(batch[0])
     ext_mapping = pl_module.external_mapping(spatial)
     cross_attn = torch.cat([id_cross_att, ext_mapping], dim=1).transpose(1,2)
     result['cross_attn'] = pl_module.external_mapping.cross_attn_adapter(cross_attn)

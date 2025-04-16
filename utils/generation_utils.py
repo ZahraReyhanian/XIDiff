@@ -2,8 +2,7 @@ import torch
 from diffusers.pipelines.ddim.pipeline_ddim_cond import DDIMPipeline
 from models.conditioner import mix_hidden_states
 import os
-# import cv2
-from torchvision.utils import save_image
+import cv2
 from tqdm import tqdm
 import numpy as np
 
@@ -24,9 +23,7 @@ def generate_image(pl_module, dataloader, device, batch_size=1, num_workers=0, s
             save_path = os.path.join(save_root, save_name)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-            image = image.reshape(3,112,112)
-            image = torch.from_numpy(image.copy())
-            save_image(tensor=image, fp=save_path)
+            cv2.imwrite(save_path, image)
 
         if it > 10:
             break
@@ -78,14 +75,14 @@ def render_condition(batch, pl_module, batch_size=1, between_zero_and_one=True, 
     pipeline.set_progress_bar_config(disable=not show_progress)
 
     # add random noise to image
-    clean_images = batch[0]
-    bsz = clean_images.shape[0]
-    noise = torch.randn(clean_images.shape).to(clean_images.device)
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
-    timesteps = torch.randint(0, pl_module.n_steps, (bsz,)).long().to(device)
-
-    noisy_images = pl_module.noise_scheduler_ddim.add_noise(clean_images, noise, timesteps)
+    # clean_images = batch[0]
+    # bsz = clean_images.shape[0]
+    # noise = torch.randn(clean_images.shape).to(clean_images.device)
+    # use_cuda = torch.cuda.is_available()
+    # device = torch.device("cuda" if use_cuda else "cpu")
+    # timesteps = torch.randint(0, pl_module.n_steps, (bsz,)).long().to(device)
+    #
+    # noisy_images = pl_module.noise_scheduler_ddim.add_noise(clean_images, noise, timesteps)
 
     pred_result = pipeline(generator=generator, batch_size=batch_size, output_type="numpy",
                            num_inference_steps=50, eta=1.0, use_clipped_model_output=False,

@@ -338,7 +338,6 @@ class ExternalMappingV4Dropout(nn.Module):
 
     def forward(self, spatial_features):
         assert len(self.channels) == len(spatial_features)
-
         outs = []
         for i, feature in enumerate(spatial_features):
             relu = getattr(self, 'relu_{}'.format(i))
@@ -455,43 +454,43 @@ def make_external_mapping(config, unet_config):
     if config["version"] == None:
         return None
     if config["version"] == 'v1':
-        assert unet_config['params'].condition_type == 'cross_attn'
-        assert unet_config['params'].condition_source == 'spatial_and_label_center'
+        assert unet_config['params']["condition_type"] == 'cross_attn'
+        assert unet_config['params']["condition_source"] == 'spatial_and_label_center'
         ext_mapping = ExternalMappingV1(return_spatial=config['return_spatial'],
                                         out_size=(config["spatial_dim"], config["spatial_dim"]),
                                         out_channel=config["out_channel"])
     elif config["version"] == 'v2':
-        assert unet_config['params'].condition_type == 'add_and_cat'
-        assert unet_config['params'].condition_source == 'spatial_and_label_center'
+        assert unet_config['params']["condition_type"] == 'add_and_cat'
+        assert unet_config['params']["condition_source"] == 'spatial_and_label_center'
         ext_mapping = ExternalMappingV2(return_spatial=config['return_spatial'],
                                         out_size=(config["spatial_dim"], config["spatial_dim"]),
                                         out_channel=config["out_channel"])
     elif config["version"] == 'v3':
-        assert unet_config['params'].condition_type == 'cross_attn' or \
-               unet_config['params'].condition_type == 'crossatt_and_stylemod'
-        assert unet_config['params'].condition_source == 'patchstat_spatial_and_linear_label_center' or \
-               unet_config['params'].condition_source == 'patchstat_spatial_and_image'
+        assert unet_config['params']["condition_type"] == 'cross_attn' or \
+               unet_config['params']["condition_type"] == 'crossatt_and_stylemod'
+        assert unet_config['params']["condition_source"] == 'patchstat_spatial_and_linear_label_center' or \
+               unet_config['params']["condition_source"] == 'patchstat_spatial_and_image'
         ext_mapping = ExternalMappingV3(return_spatial=config['return_spatial'],
                                         out_size=(config["spatial_dim"], config["spatial_dim"]),
                                         out_channel=config["out_channel"])
     elif config["version"] == 'v4':
         print('v4 external')
-        assert unet_config['params'].condition_type in ['cross_attn', 'crossatt_and_stylemod']
-        assert unet_config['params'].condition_source in ['patchstat_spatial_and_linear_label_center', 'patchstat_spatial_and_image', 'image_and_patchstat_spatial']
+        assert unet_config['params']["condition_type"] in ['cross_attn', 'crossatt_and_stylemod']
+        assert unet_config['params']["condition_source"] in ['patchstat_spatial_and_linear_label_center', 'patchstat_spatial_and_image', 'image_and_patchstat_spatial']
         ext_mapping = ExternalMappingV4(return_spatial=config['return_spatial'],
                                         out_size=(config["spatial_dim"], config["spatial_dim"]),
                                         out_channel=config["out_channel"])
     elif config["version"] == 'v4_dropout':
         print('v4_dropout external', config["dropout_prob"])
-        assert unet_config["condition_type"] in ['cross_attn', 'crossatt_and_stylemod']
-        assert unet_config["condition_source"] in ['patchstat_spatial_and_linear_label_center', 'patchstat_spatial_and_image', 'image_and_patchstat_spatial']
+        assert unet_config['params']["condition_type"] in ['cross_attn', 'crossatt_and_stylemod']
+        assert unet_config['params']["condition_source"] in ['patchstat_spatial_and_linear_label_center', 'patchstat_spatial_and_image', 'image_and_patchstat_spatial']
         ext_mapping = ExternalMappingV4Dropout(return_spatial=config['return_spatial'],
                                                out_size=(config["spatial_dim"], config["spatial_dim"]),
                                                out_channel=config["out_channel"],
                                                dropout_prob=config["dropout_prob"])
     elif config["version"] == 'v5':
-        assert unet_config["condition_type"] in ['cross_attn', 'crossatt_and_stylemod']
-        assert unet_config["condition_source"] in ['patchstat_spatial_and_linear_label_center', 'patchstat_spatial_and_image', 'image_and_patchstat_spatial']
+        assert unet_config['params']["condition_type"] in ['cross_attn', 'crossatt_and_stylemod']
+        assert unet_config['params']["condition_source"] in ['patchstat_spatial_and_linear_label_center', 'patchstat_spatial_and_image', 'image_and_patchstat_spatial']
         ext_mapping = ExternalMappingV5(return_spatial=config['return_spatial'],
                                         out_size=(config["spatial_dim"], config["spatial_dim"]),
                                         out_channel=config["out_channel"])

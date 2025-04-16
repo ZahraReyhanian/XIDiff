@@ -90,7 +90,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
         cossim_loss = calc_time_depenent_loss(x0_pred_feature, center,
                                        timesteps=timesteps,
                                        version=pl_module.identity_consistency_loss_version,
-                                       max_timesteps=pl_module.sampler.num_train_timesteps,
+                                       max_timesteps=pl_module.sampler["num_train_timesteps"],
                                        )
     elif pl_module.identity_consistency_loss_source == 'image':
         orig_feature, _ = recognition_model(batch[0])
@@ -108,7 +108,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
             cossim_loss_center = calc_time_depenent_loss(x0_pred_feature, center,
                                                   timesteps=timesteps,
                                                   version=pl_module.identity_consistency_loss_version,
-                                                  max_timesteps=pl_module.sampler.num_train_timesteps,
+                                                  max_timesteps=pl_module.sampler["num_train_timesteps"],
                                                   return_avg=False,
                                                   )
         elif pl_module.identity_consistency_loss_center_source == 'id_image':
@@ -118,9 +118,10 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
             cossim_loss_center = calc_time_depenent_loss(x0_pred_feature, id_feature,
                                                         timesteps=timesteps,
                                                         version=pl_module.identity_consistency_loss_version,
-                                                        max_timesteps=pl_module.sampler.num_train_timesteps,
+                                                        max_timesteps=pl_module.sampler["num_train_timesteps"],
                                                         return_avg=False,
                                                         )
+            print("Youuuuuuuuuuuuuuuu should here!")
         else:
             raise ValueError(f'{pl_module.identity_consistency_loss_center_source} '
                              f'pl_module.identity_consistency_loss_center_source not right')
@@ -131,7 +132,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
         cossim_loss_image = calc_time_depenent_loss(x0_pred_feature, orig_feature,
                                        timesteps=timesteps,
                                        version=pl_module.identity_consistency_loss_version,
-                                       max_timesteps=pl_module.sampler.num_train_timesteps,
+                                       max_timesteps=pl_module.sampler["num_train_timesteps"],
                                        return_avg=False,
                                        )
 
@@ -143,7 +144,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
         else:
             weight_start = 0.0
 
-        weights = np.linspace(weight_start, 1, pl_module.sampler.num_train_timesteps+1)**order
+        weights = np.linspace(weight_start, 1, pl_module.sampler["num_train_timesteps"]+1)**order
         weights_tensor = torch.tensor(weights, dtype=cossim_loss_center.dtype, device=cossim_loss_center.device)
         mix_weights = weights_tensor[timesteps]
 
@@ -165,7 +166,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
         cossim_loss = calc_time_depenent_loss(x0_pred_feature, orig_feature,
                                               timesteps=timesteps,
                                               version=pl_module.identity_consistency_loss_version,
-                                              max_timesteps=pl_module.sampler.num_train_timesteps,
+                                              max_timesteps=pl_module.sampler["num_train_timesteps"],
                                               )
 
     if pl_module.spatial_consistency_loss_lambda > 0.0:
@@ -174,11 +175,11 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
         orig_mean, orig_var = extract_mean_var(orig_spatial)
         spat_mean_loss = calc_time_depenent_loss(pred_mean, orig_mean, timesteps=timesteps,
                                                  version=pl_module.spatial_consistency_loss_version,
-                                                 max_timesteps=pl_module.sampler.num_train_timesteps,
+                                                 max_timesteps=pl_module.sampler["num_train_timesteps"],
                                                  metric='l1')
         spat_var_loss = calc_time_depenent_loss(pred_var, orig_var, timesteps=timesteps,
                                                 version=pl_module.spatial_consistency_loss_version,
-                                                max_timesteps=pl_module.sampler.num_train_timesteps,
+                                                max_timesteps=pl_module.sampler["num_train_timesteps"],
                                                 metric='l1')
         spatial_loss = (spat_mean_loss + spat_var_loss)/2
     else:
