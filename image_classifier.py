@@ -18,7 +18,10 @@ dir_valid = '/opt/data/reyhanian/data/affectnet/valid'
 
 img_size = 112
 transform = transforms.Compose([transforms.Resize((img_size, img_size)),
-                                            transforms.ToTensor()])
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)])
 
 # load dataset
 data_train = datasets.ImageFolder(dir, transform=transform)

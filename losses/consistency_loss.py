@@ -93,7 +93,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
                                        max_timesteps=pl_module.sampler["num_train_timesteps"],
                                        )
     elif pl_module.identity_consistency_loss_source == 'image':
-        orig_feature, _ = recognition_model(batch[0])
+        orig_feature, _ = recognition_model(batch[0]) # Todo style image
         orig_feature_norm = torch.norm(orig_feature, 2, -1, keepdim=True)
         orig_feature = orig_feature / orig_feature_norm
         cossim_loss = calc_time_depenent_loss(x0_pred_feature, orig_feature,
@@ -126,7 +126,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
             raise ValueError(f'{pl_module.identity_consistency_loss_center_source} '
                              f'pl_module.identity_consistency_loss_center_source not right')
 
-        orig_feature, _ = recognition_model(batch[0])
+        orig_feature, _ = recognition_model(batch[0]) # Todo style image
         orig_feature_norm = torch.norm(orig_feature, 2, -1, keepdim=True)
         orig_feature = orig_feature / orig_feature_norm
         cossim_loss_image = calc_time_depenent_loss(x0_pred_feature, orig_feature,
@@ -171,7 +171,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
 
     if pl_module.spatial_consistency_loss_lambda > 0.0:
         pred_mean, pred_var = extract_mean_var(spatial)
-        orig_feature, orig_spatial = recognition_model(batch[0])
+        orig_feature, orig_spatial = recognition_model(batch[0]) # Todo style image
         orig_mean, orig_var = extract_mean_var(orig_spatial)
         spat_mean_loss = calc_time_depenent_loss(pred_mean, orig_mean, timesteps=timesteps,
                                                  version=pl_module.spatial_consistency_loss_version,

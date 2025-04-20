@@ -15,6 +15,7 @@ from datamodules.face_datamodule import FaceDataModule
 
 epochs=100
 n_steps=1000
+last = False
 
 unet_config = {
     "freeze_unet": False,
@@ -40,7 +41,7 @@ unet_config = {
         {"gradient_checkpointing": True,
          "condition_type": 'crossatt_and_stylemod',
          "condition_source": 'patchstat_spatial_and_image',
-         "cross_attention_dim'": 512,
+         "cross_attention_dim": 512,
          'image_size': 112,
          'in_channels': 3,
          'out_channels': 3,
@@ -118,11 +119,14 @@ def training(cfg):
     # set seed for random number generators in pytorch, numpy and python.random
     pl.seed_everything(cfg["seed"], workers=True)
     path = cfg["dataset_path"]
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
 
     datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]), batch_size=cfg["batch_size"])
 
     model = MyModelTrainer(unet_config=unet_config,
-                           # ckpt_path=cfg["ckpt_path"],
+                           ckpt_path=cfg["ckpt_path"],
+                           last=last,
                            lr=cfg['lr'],
                            recognition=recognition,
                            recognition_eval=recognition_eval,
@@ -131,7 +135,8 @@ def training(cfg):
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
-                           sampler=sampler)
+                           sampler=sampler,
+                           device=device)
 
     print("Instantiating callbacks...")
     callbacks = create_list_of_callbacks(cfg["ckpt_path"])

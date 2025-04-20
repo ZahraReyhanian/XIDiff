@@ -70,8 +70,8 @@ def make_unet(unet_config):
                                     condition_type=unet_config['params']['condition_type'],
                                     cross_attn_dim=unet_config['params']['cross_attention_dim']
                                     )
-    if unet_config.get("pretrained_model_path"):
-        print('loading model from {}'.format(unet_config["pretrained_model_path"]))
-        statedict = torch.load(unet_config["pretrained_model_path"], map_location='cuda')
-        res = model.load_state_dict(statedict, strict=True)
+    # if unet_config.get("pretrained_model_path"):
+    #     print('loading model from {}'.format(unet_config["pretrained_model_path"]))
+    #     statedict = torch.load(unet_config["pretrained_model_path"], map_location='cuda')
+    #     res = model.load_state_dict(statedict, strict=True)
     return model

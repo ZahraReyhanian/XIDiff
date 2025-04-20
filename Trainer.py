@@ -43,6 +43,7 @@ class Trainer(pl.LightningModule):
                  sampler=None,
                  use_ema=True,
                  device=None,
+                 last=None,
                  image_size=112,
                  *args, **kwargs
                  ):
@@ -104,11 +105,14 @@ class Trainer(pl.LightningModule):
 
 
 
-        if ckpt_path is not None:
-            print('loading checkpoint in initalization from ', ckpt_path, '...............')
-            name = get_latest_file(ckpt_path)
-            print(name)
-            ckpt_path = os.path.join(ckpt_path, name)
+        if last is not None:
+            if ckpt_path is not None and last:
+                print('loading checkpoint in initalization from ', ckpt_path, '...............')
+                name = get_latest_file(ckpt_path)
+                print(name)
+                ckpt_path = os.path.join(ckpt_path, name)
+            else:
+                ckpt_path = unet_config['params']['pretrained_model_path']
             ckpt = torch.load(ckpt_path, map_location='cpu')['state_dict']
             model_statedict = {key[6:]: val for key, val in ckpt.items() if key.startswith('model.')}
             self.model.load_state_dict(model_statedict)
@@ -164,9 +168,6 @@ class Trainer(pl.LightningModule):
         pass
 
     def shared_step(self, batch, stage='train', optimizer_idx=0, *args, **kwargs):
-        batch[0] = batch[0].to(self.trainer_device)
-        batch[1] = batch[1].to(self.trainer_device)
-
         clean_images = batch[0]
 
         bsz = clean_images.shape[0]
@@ -174,8 +175,8 @@ class Trainer(pl.LightningModule):
 
         # Sample a random timestep for each image
         timesteps = torch.randint(
-            0, self.noise_scheduler.config.num_train_timesteps, (bsz,), device=self.trainer_device
-        ).long()
+            0, self.noise_scheduler.config.num_train_timesteps, (bsz,)
+        ).long().to(self.trainer_device)
 
         loss_dict = {}
         total_loss = 0.0

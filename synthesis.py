@@ -32,7 +32,9 @@ def main():
     # load pl_module
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    pl_module = MyModelTrainer(**model_hparam, ckpt_path='/opt/data/reyhanian/checkpoints/', device=device)
+    last = True
+
+    pl_module = MyModelTrainer(**model_hparam, ckpt_path=cfg['ckpt_path'], last=last, device=device)
     print('Instantiated ', model_hparam['_target_'])
     # load model
 
@@ -45,14 +47,12 @@ def main():
                                     transforms.ToTensor()])
 
     # load dataset
-    print("cudaaaaaaaaaaaaa is available?!")
-    print(torch.cuda.is_available())
+    print("loading dataset ........")
 
     path = cfg["dataset_path"]
     data_test = datasets.ImageFolder(f'{path}test', transform=transform)
     bs = 1
     test_loader = DataLoader(data_test, batch_size=1)
-    device = torch.device("cuda")
 
     generate_image(pl_module=pl_module,
                    save_root="generated_images",
