@@ -16,6 +16,7 @@ from datamodules.face_datamodule import FaceDataModule
 epochs=100
 n_steps=1000
 last = False
+root = '/opt/data/reyhanian'
 
 unet_config = {
     "freeze_unet": False,
@@ -136,7 +137,8 @@ def training(cfg):
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
                            sampler=sampler,
-                           device=device)
+                           device=device,
+                           root=root)
 
     print("Instantiating callbacks...")
     callbacks = create_list_of_callbacks(cfg["ckpt_path"])

@@ -3,6 +3,8 @@ from typing import Any, List
 import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from torch.nn import functional as F
+
+from expression.expression_encoder import create_expression_encoder
 from models.conditioner import make_condition
 from recognition.external_mapping import make_external_mapping
 from models import model_helper
@@ -45,6 +47,7 @@ class Trainer(pl.LightningModule):
                  device=None,
                  last=None,
                  image_size=112,
+                 root='',
                  *args, **kwargs
                  ):
 
@@ -97,12 +100,11 @@ class Trainer(pl.LightningModule):
 
         self.valid_loss_metric = torchmetrics.MeanMetric()
 
-        print("make_id_extractor")
         self.id_extractor = make_label_mapping(label_mapping, unet_config)
 
-        print("make_external_mapping")
-        self.external_mapping = make_external_mapping(external_mapping, unet_config)
+        self.expression_encoder = create_expression_encoder(device, root=root)
 
+        self.external_mapping = None
 
 
         if last is not None:
@@ -111,11 +113,14 @@ class Trainer(pl.LightningModule):
                 name = get_latest_file(ckpt_path)
                 print(name)
                 ckpt_path = os.path.join(ckpt_path, name)
+                ckpt = torch.load(ckpt_path, map_location='cpu')['state_dict']
+                model_statedict = {key[6:]: val for key, val in ckpt.items() if key.startswith('model.')}
+                self.model.load_state_dict(model_statedict)
             else:
                 ckpt_path = unet_config['params']['pretrained_model_path']
-            ckpt = torch.load(ckpt_path, map_location='cpu')['state_dict']
-            model_statedict = {key[6:]: val for key, val in ckpt.items() if key.startswith('model.')}
-            self.model.load_state_dict(model_statedict)
+                statedict = torch.load(ckpt_path, map_location='cpu')
+                self.model.load_state_dict(statedict, strict=True)
+
 
         if unet_config['freeze_unet']:
             print('freeze unet')
@@ -168,7 +173,7 @@ class Trainer(pl.LightningModule):
         pass
 
     def shared_step(self, batch, stage='train', optimizer_idx=0, *args, **kwargs):
-        clean_images = batch[0]
+        clean_images = batch["id_img"]
 
         bsz = clean_images.shape[0]
         noise = torch.randn(clean_images.shape).to(self.trainer_device)
@@ -217,8 +222,11 @@ class Trainer(pl.LightningModule):
     #     self.log_dict(norms)
 
     def get_encoder_hidden_states(self, batch, batch_size=None):
-        batch[0] = batch[0].to(self.trainer_device)
-        batch[1] = batch[1].to(self.trainer_device)
+        batch["id_img"] = batch["id_img"].to(self.trainer_device)
+        batch["src_label"] = batch["src_label"].to(self.trainer_device)
+        batch["exp_img"] = batch["exp_img"].to(self.trainer_device)
+        batch["target_label"] = batch["target_label"].to(self.trainer_device)
+
         encoder_hidden_states = make_condition(pl_module=self,
                                                batch=batch
                                                )

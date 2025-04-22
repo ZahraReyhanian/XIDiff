@@ -5,24 +5,18 @@ def make_condition(pl_module, batch):
 
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
 
-    print(batch[0].device)
-    id_feat, id_cross_att = pl_module.id_extractor(batch[0]) # id_image
+    id_feat, id_cross_att = pl_module.id_extractor(batch["id_img"]) # id_image
 
-    _, spatial = pl_module.recognition_model(batch[0]) # Todo style image
-    ext_mapping = pl_module.external_mapping(spatial)
-    # maybe ext_mapping is for style and should be delete
-    print('id_cross_att shape: -----------------------------')
-    print(id_cross_att.shape)
-    print('ext_mapping shape: -----------------------------')
-    print(ext_mapping.shape)
-    cross_attn = torch.cat([id_cross_att, ext_mapping], dim=1).transpose(1,2)
-    result['cross_attn'] = pl_module.external_mapping.cross_attn_adapter(cross_attn)
-    print('cross_attn shape: -----------------------------')
-    print(result['cross_attn'].shape)
+     # style image batch["exp_img"]
+    kps_src, kps_driv, expression_vector = pl_module.expression_encoder.extract_keypoints_and_expression(batch["id_img"], batch["exp_img"])
+
+    cross_attn = torch.cat([id_cross_att, expression_vector], dim=1).transpose(1,2)
+    result['cross_attn'] = pl_module.expression_encoder.cross_attn_adapter(cross_attn)
+
 
     result['stylemod'] = id_feat
 
-    class_label = batch[1].to(pl_module.device)
+    class_label = batch["src_label"].to(pl_module.device)
     center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
 
     result['center_emb'] = center_emb

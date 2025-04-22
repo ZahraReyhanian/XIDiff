@@ -2,6 +2,7 @@ from typing import Optional
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision import datasets, transforms
+from datamodules.wrapper_dataset import WrapperDataset
 
 class FaceDataModule(LightningDataModule):
 
@@ -34,11 +35,13 @@ class FaceDataModule(LightningDataModule):
                                             transforms.ToTensor()])
 
             # load dataset
-            self.data_train = datasets.ImageFolder(f'{self.dataset_path}train', transform=transform)
-            self.data_val = datasets.ImageFolder(f'{self.dataset_path}valid', transform=transform)
-            self.data_test = datasets.ImageFolder(f'{self.dataset_path}test', transform=transform)
+            train_base = datasets.ImageFolder(f'{self.dataset_path}train', transform=transform)
+            val_base = datasets.ImageFolder(f'{self.dataset_path}valid', transform=transform)
+            test_base = datasets.ImageFolder(f'{self.dataset_path}test', transform=transform)
 
-            print(self.data_train)
+            self.data_train = WrapperDataset(train_base)
+            self.data_val = WrapperDataset(val_base)
+            self.data_test = WrapperDataset(test_base)
 
     def train_dataloader(self):
         return DataLoader(
