@@ -14,16 +14,26 @@ def generate_image(pl_module, dataloader, device, batch_size=1, num_workers=0, s
 
     it = 0
     for batch in tqdm(dataloader, total=len(dataloader), desc='Generating Dataset: '):
-
+        print('source_label:', batch['src_label'])
+        print('target_label:', batch['target_label'])
         plotting_images = sample_batch(batch, pl_module, seed=seed)
         for i, image in enumerate(plotting_images):
             save_name = f"img_{i}_{it}.jpg"
-            it+=1
             #save image
             save_path = os.path.join(save_root, save_name)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
             cv2.imwrite(save_path, image)
+            print(image.shape)
+
+            exp_image = batch['exp_img'].squeeze().cpu().numpy().reshape(256,256,3)
+            print(exp_image.shape)
+            print(exp_image)
+            save_path = os.path.join(save_root, f"img_{i}_{it}-exp.jpg")
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            cv2.imwrite(save_path, exp_image)
+
+            it+=1
 
         if it > 10:
             break

@@ -1,6 +1,7 @@
 import os
 import torch
 from Trainer import Trainer as MyModelTrainer
+from datamodules.face_datamodule import FaceDataModule
 from utils.generation_utils import generate_image
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
@@ -8,6 +9,7 @@ import re
 import json
 
 root = '/opt/data/reyhanian'
+image_size = 256
 
 def natural_sort(l):
     convert = lambda text: int(text) if text.isdigit() else text.lower()
@@ -34,7 +36,7 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
     last = True
 
-    pl_module = MyModelTrainer(**model_hparam, ckpt_path=cfg['ckpt_path'], last=last, device=device)
+    pl_module = MyModelTrainer(**model_hparam, ckpt_path=cfg['ckpt_path'], last=last, device=device, root=root)
     print('Instantiated ', model_hparam['_target_'])
     # load model
 
@@ -50,14 +52,14 @@ def main():
     print("loading dataset ........")
 
     path = cfg["dataset_path"]
-    data_test = datasets.ImageFolder(f'{path}test', transform=transform)
     bs = 1
-    test_loader = DataLoader(data_test, batch_size=1)
+    datamodule = FaceDataModule(dataset_path=path, img_size=(image_size, image_size), batch_size=bs)
+    datamodule.setup()
 
     generate_image(pl_module=pl_module,
                    save_root="generated_images",
                    batch_size=bs,
-                   dataloader=test_loader,
+                   dataloader=datamodule.test_dataloader(),
                    device=device)
 
 
