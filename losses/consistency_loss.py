@@ -121,7 +121,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
                                                         max_timesteps=pl_module.sampler["num_train_timesteps"],
                                                         return_avg=False,
                                                         )
-            # print("Youuuuuuuuuuuuuuuu should here!")
+            # here should be executed
         else:
             raise ValueError(f'{pl_module.identity_consistency_loss_center_source} '
                              f'pl_module.identity_consistency_loss_center_source not right')

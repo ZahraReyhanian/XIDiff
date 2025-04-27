@@ -1,43 +1,42 @@
 import os
 import json
 import torch
+import time
 
 from typing import Tuple
 import pytorch_lightning as pl
 from pytorch_lightning.strategies.ddp import DDPStrategy
-# from pytorch_lightning.loggers.wandb import WandbLogger
-# from utils.training_utils import log_hyperparameters
+
 from Trainer import Trainer as MyModelTrainer
 from utils import os_utils
 from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
 
-
-epochs=100
-n_steps=1000
+epochs = 100
+n_steps = 1000
 last = False
 root = '/opt/data/reyhanian'
 
 unet_config = {
     "freeze_unet": False,
     'model_params':
-            {"image_size": 112,
-             "num_channels": 128,
-             "num_res_blocks": 1,
-             "channel_mult": '',
-             "learn_sigma": True,
-             "class_cond": False,
-             "use_checkpoint": False,
-             "attention_resolutions": "16",
-             "num_heads": 4,
-             "num_head_channels": 64,
-             "num_heads_upsample": -1,
-             "use_scale_shift_norm": True,
-             "dropout": 0.0,
-             "resblock_updown": True,
-             "use_fp16": False,
-             "use_new_attention_order": False
-             },
+        {"image_size": 112,
+         "num_channels": 128,
+         "num_res_blocks": 1,
+         "channel_mult": '',
+         "learn_sigma": True,
+         "class_cond": False,
+         "use_checkpoint": False,
+         "attention_resolutions": "16",
+         "num_heads": 4,
+         "num_head_channels": 64,
+         "num_heads_upsample": -1,
+         "use_scale_shift_norm": True,
+         "dropout": 0.0,
+         "resblock_updown": True,
+         "use_fp16": False,
+         "use_new_attention_order": False
+         },
     'params':
         {"gradient_checkpointing": True,
          "condition_type": 'crossatt_and_stylemod',
@@ -49,19 +48,17 @@ unet_config = {
          'pretrained_model_path': '/opt/data/reyhanian/pretrained_models/ffhq_10m.pt'}
 }
 
-
-
 label_mapping = {
     'version': 'v4', 'out_channel': 256, 'num_latent': 8,
-        'recognition_config':
-            {'backbone': 'ir_50',
-            'dataset': 'webface4m',
-            'loss_fn': 'adaface',
-            'normalize_feature': False,
-            'return_spatial': [21],
-            'head_name': 'none',
-            'ckpt_path': None,
-            'center_path': None}
+    'recognition_config':
+        {'backbone': 'ir_50',
+         'dataset': 'webface4m',
+         'loss_fn': 'adaface',
+         'normalize_feature': False,
+         'return_spatial': [21],
+         'head_name': 'none',
+         'ckpt_path': None,
+         'center_path': None}
 }
 
 recognition = {
@@ -75,8 +72,7 @@ recognition = {
     'center_path': '/opt/data/reyhanian/pretrained_models/center_ir_50_adaface_casia_faces_webface_112x112.pth'
 }
 
-
-recognition_eval ={
+recognition_eval = {
     'backbone': 'ir_101',
     'dataset': 'webface4m',
     'loss_fn': 'adaface',
@@ -87,21 +83,21 @@ recognition_eval ={
     'center_path': '/opt/data/reyhanian/pretrained_models/center_ir_101_adaface_webface4m_faces_webface_112x112.pth'
 }
 
-
-sampler= {
+sampler = {
     "num_train_timesteps": n_steps,
     "beta_start": 0.0001,
     "beta_end": 0.02,
     "variance_type": "learned_range"
 }
 
-external_mapping= {
+external_mapping = {
     "version": "v4_dropout",
     "return_spatial": [2],
     "spatial_dim": 5,
     "out_channel": 512,
     "dropout_prob": 0.3
 }
+
 
 def training(cfg):
     """Trains the model. Can additionally evaluate on a testset, using best weights obtained during
@@ -123,7 +119,8 @@ def training(cfg):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]), batch_size=cfg["batch_size"])
+    datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]),
+                                batch_size=cfg["batch_size"])
 
     model = MyModelTrainer(unet_config=unet_config,
                            ckpt_path=cfg["ckpt_path"],
@@ -131,7 +128,7 @@ def training(cfg):
                            lr=cfg['lr'],
                            recognition=recognition,
                            recognition_eval=recognition_eval,
-                           label_mapping= label_mapping,
+                           label_mapping=label_mapping,
                            external_mapping=external_mapping,
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
@@ -157,7 +154,6 @@ def training(cfg):
         # "logger": logger,
         "trainer": trainer,
     }
-
 
     if cfg["training"]:
         print("Starting training...")
@@ -199,7 +195,7 @@ def main():
         cfg = json.load(f)
 
     print(f"tmp directory : {cfg['output_dir']}")
-    #TODO: if exits remove
+    # TODO: if exits remove
     # if 'experiments' in cfg.output_dir:
     #     print(f"removing tmp directory : {cfg.output_dir}")
     #     shutil.rmtree(cfg.paths.output_dir, ignore_errors=True)
@@ -215,9 +211,9 @@ def main():
     print(f"Saving Directory          : {cfg['output_dir']}")
     available_gpus = torch.cuda.device_count()
     print("available_gpus------------", available_gpus)
-    # cfg.datamodule.batch_size = int(cfg.datamodule.total_gpu_batch_size / available_gpus)
-    # print('Per GPU batchsize:', cfg.datamodule.batch_size)
-    # time.sleep(1)
+
+    print('Per GPU batchsize:', cfg['batch_size'])
+    time.sleep(1)
 
     # train the model
     metric_dict, _ = training(cfg)

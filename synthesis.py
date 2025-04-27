@@ -3,8 +3,6 @@ import torch
 from Trainer import Trainer as MyModelTrainer
 from datamodules.face_datamodule import FaceDataModule
 from utils.generation_utils import generate_image
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
 import re
 import json
 
@@ -43,10 +41,6 @@ def main():
     pl_module.load_state_dict(ckpt['state_dict'], strict=True)
     pl_module.to('cuda')
     pl_module.eval()
-
-
-    transform = transforms.Compose([transforms.Resize((48,48)),
-                                    transforms.ToTensor()])
 
     # load dataset
     print("loading dataset ........")
