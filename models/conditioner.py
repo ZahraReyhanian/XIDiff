@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 
+
+
 def make_condition(pl_module, batch):
 
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
@@ -8,11 +10,16 @@ def make_condition(pl_module, batch):
     id_feat, id_cross_att = pl_module.id_extractor(batch["id_img"]) # id_image
 
      # style image batch["exp_img"]
-    kps_src, kps_driv, expression_vector = pl_module.expression_encoder.extract_keypoints_and_expression(batch["id_img"], batch["exp_img"])
+    # kps_src, kps_driv, expression_vector = pl_module.expression_encoder.extract_keypoints_and_expression(batch["id_img"], batch["exp_img"])
+    #
+    # cross_attn = torch.cat([id_cross_att, expression_vector], dim=1).transpose(1,2)
+    # result['cross_attn'] = pl_module.expression_encoder.cross_attn_adapter(cross_attn)
 
-    cross_attn = torch.cat([id_cross_att, expression_vector], dim=1).transpose(1,2)
-    result['cross_attn'] = pl_module.expression_encoder.cross_attn_adapter(cross_attn)
+    _, spatial = pl_module.recognition_model(batch["exp_img"])  # exp_image
+    ext_mapping = pl_module.external_mapping(spatial)
 
+    cross_attn = torch.cat([id_cross_att, ext_mapping], dim=1).transpose(1, 2)
+    result['cross_attn'] = pl_module.external_mapping.cross_attn_adapter(cross_attn)
 
     result['stylemod'] = id_feat
 

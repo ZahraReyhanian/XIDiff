@@ -91,7 +91,7 @@ class Trainer(pl.LightningModule):
         # enable training
         print("make recognition model")
         self.recognition_model: RecognitionModel = make_recognition_model(recognition,
-                                                                          enable_training=True)
+                                                                          enable_training=False)
         if same_config(recognition, recognition_eval,
                        skip_keys=['return_spatial', 'center_path']):
             self.recognition_model_eval = self.recognition_model
@@ -102,9 +102,9 @@ class Trainer(pl.LightningModule):
 
         self.id_extractor = make_label_mapping(label_mapping, unet_config)
 
-        self.expression_encoder = create_expression_encoder(device, root=root)
+        # self.expression_encoder = create_expression_encoder(device, root=root)
 
-        self.external_mapping = None
+        self.external_mapping = make_external_mapping(external_mapping, unet_config)
 
 
         if last is not None:
