@@ -2,3 +2,7 @@
 data/*
 config/config.json
 pretrained_models/*
+generated_images/*
+__pycache__/
+*.py[cod]
+*$py.class
