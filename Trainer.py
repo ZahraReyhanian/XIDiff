@@ -30,7 +30,6 @@ class Trainer(pl.LightningModule):
                  label_mapping=None,
                  external_mapping=None,
                  output_dir=None,
-                 ckpt_path=None,
                  lr=0.001,
                  mse_loss_lambda=1,
                  identity_consistency_loss_lambda=0.05,
@@ -45,7 +44,7 @@ class Trainer(pl.LightningModule):
                  sampler=None,
                  use_ema=True,
                  device=None,
-                 last=None,
+                 use_pretrained=False,
                  image_size=112,
                  root='',
                  *args, **kwargs
@@ -72,6 +71,12 @@ class Trainer(pl.LightningModule):
         self.use_ema = use_ema
         self.trainer_device = device
 
+        recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
+        recognition['center_path'] = os.path.join(root, recognition['center_path'])
+        recognition_eval['center_path'] = os.path.join(root, recognition_eval['center_path'])
+        print('++++++++++++++++++------------------')
+        print(recognition['ckpt_path'])
+
         self.model = model_helper.make_unet(unet_config)
         self.ema_model = EMAModel(self.model, inv_gamma=1.0, power=3 / 4, max_value=0.9999)
         # if 'gradient_checkpointing' in unet_config and unet_config['gradient_checkpointing']:
@@ -90,36 +95,28 @@ class Trainer(pl.LightningModule):
 
         # enable training
         print("make recognition model")
-        self.recognition_model: RecognitionModel = make_recognition_model(recognition,
-                                                                          enable_training=False)
+        print(recognition)
+        self.recognition_model: RecognitionModel = make_recognition_model(recognition, root, enable_training=False)
         if same_config(recognition, recognition_eval,
                        skip_keys=['return_spatial', 'center_path']):
             self.recognition_model_eval = self.recognition_model
         else:
-            self.recognition_model_eval: RecognitionModel = make_recognition_model(recognition_eval)
+            self.recognition_model_eval: RecognitionModel = make_recognition_model(recognition_eval, root)
 
         self.valid_loss_metric = torchmetrics.MeanMetric()
 
-        self.id_extractor = make_label_mapping(label_mapping, unet_config)
+        self.id_extractor = make_label_mapping(label_mapping, unet_config, root)
 
         # self.expression_encoder = create_expression_encoder(device, root=root)
 
         self.external_mapping = make_external_mapping(external_mapping, unet_config)
 
 
-        if last is not None:
-            if ckpt_path is not None and last:
-                print('loading checkpoint in initalization from ', ckpt_path, '...............')
-                name = get_latest_file(ckpt_path)
-                print(name)
-                ckpt_path = os.path.join(ckpt_path, name)
-                ckpt = torch.load(ckpt_path, map_location='cpu')['state_dict']
-                model_statedict = {key[6:]: val for key, val in ckpt.items() if key.startswith('model.')}
-                self.model.load_state_dict(model_statedict)
-            else:
-                ckpt_path = unet_config['params']['pretrained_model_path']
-                statedict = torch.load(ckpt_path, map_location='cpu')
-                self.model.load_state_dict(statedict, strict=True)
+        if use_pretrained: #use pretrained unet
+            ckpt_path = os.path.join(root, unet_config['params']['pretrained_model_path'])
+
+            statedict = torch.load(ckpt_path, map_location='cpu')
+            self.model.load_state_dict(statedict, strict=True)
 
 
         if unet_config['freeze_unet']:
@@ -128,6 +125,8 @@ class Trainer(pl.LightningModule):
             self.model.train = partial(disabled_train, self=self.model)
             for param in self.model.parameters():
                 param.requires_grad = False
+
+        self.save_hyperparameters()
 
     def get_parameters(self):
         if self.unet_config['freeze_unet']:

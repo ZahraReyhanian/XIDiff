@@ -5,7 +5,7 @@ from recognition import recognition_helper
 import copy
 
 
-def make_label_mapping(config, unet_config):
+def make_label_mapping(config, unet_config, root):
     if config ["version"] == None:
         label_mapping = nn.Identity()
     elif config ["version"] == 'v4':
@@ -16,7 +16,7 @@ def make_label_mapping(config, unet_config):
         config["recognition_config"]['ckpt_path'] = None
         config["recognition_config"]['center_path'] = None
         config["recognition_config"]['return_spatial'] = [21]
-        model = recognition_helper.make_recognition_model(config["recognition_config"], enable_training=True)
+        model = recognition_helper.make_recognition_model(config["recognition_config"], root, enable_training=True)
         label_mapping = ImageEmbedder(backbone=model)
         out = label_mapping.forward(torch.randn(3,3,112,112))
     else:

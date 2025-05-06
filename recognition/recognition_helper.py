@@ -30,10 +30,9 @@ def same_config(config1, config2, skip_keys=[]):
     return True
 
 
-def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn):
+def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn, root):
     print('------------------------------------------')
     print(backbone_name)
-    root = '/opt/data/reyhanian'
     if backbone_name == 'ir_101' and dataset_name == 'webface4m' and loss_fn == 'adaface':
         _name, _id = 'adaface_ir101_webface4m.ckpt', '18jQkqB0avFqWa0Pas52g54xNshUOQJpQ'
     elif backbone_name == 'ir_50' and dataset_name == 'webface4m' and loss_fn == 'adaface':
@@ -226,7 +225,7 @@ class RecognitionModel(nn.Module):
         return out
 
 
-def make_recognition_model(recognition_config, enable_training=False):
+def make_recognition_model(recognition_config, root, enable_training=False):
 
     if not recognition_config:
         return None
@@ -243,6 +242,8 @@ def make_recognition_model(recognition_config, enable_training=False):
         raise NotImplementedError()
 
     head = return_head(head_name=recognition_config["head_name"])
+    print('.....................................................................')
+    print(recognition_config)
 
     if recognition_config["ckpt_path"]:
         statedict = torch.load(recognition_config["ckpt_path"], map_location='cpu')['state_dict']
@@ -254,7 +255,7 @@ def make_recognition_model(recognition_config, enable_training=False):
         assert recognition_config["dataset"] == 'webface4m'
         assert recognition_config["loss_fn"] == 'adaface'
         print('Loading pretrained IR model trained with adaface webface4m')
-        model_statedict = download_ir_pretrained_statedict(backbone_name, 'webface4m', 'adaface')
+        model_statedict = download_ir_pretrained_statedict(backbone_name, 'webface4m', 'adaface', root)
         backbone.load_state_dict(model_statedict, strict=True)
 
     if recognition_config["center_path"]:

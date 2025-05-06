@@ -6,7 +6,6 @@ from utils.generation_utils import generate_image
 import re
 import json
 
-root = '/opt/data/reyhanian'
 image_size = 256
 
 def natural_sort(l):
@@ -19,13 +18,11 @@ def main():
     with open('config/config.json') as f:
         cfg = json.load(f)
 
+    root = cfg['root']
+
     ckpt = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
     model_hparam = ckpt['hyper_parameters']
     model_hparam['unet_config']['params']['pretrained_model_path'] = None
-    model_hparam['recognition']['ckpt_path'] = os.path.join(root, model_hparam['recognition']['ckpt_path'])
-    model_hparam['recognition']['center_path'] = os.path.join(root, model_hparam['recognition']['center_path'])
-    model_hparam['recognition_eval']['center_path'] = os.path.join(root, model_hparam['recognition_eval']['center_path'])
-
     model_hparam['_target_'] = 'src.trainer.Trainer'
     model_hparam['_partial_'] = True
 
@@ -45,9 +42,9 @@ def main():
     # load dataset
     print("loading dataset ........")
 
-    path = cfg["dataset_path"]
+    dataset_path = os.path.join(root, cfg["dataset_path"])
     bs = 1
-    datamodule = FaceDataModule(dataset_path=path, img_size=(image_size, image_size), batch_size=bs)
+    datamodule = FaceDataModule(dataset_path=dataset_path, img_size=(image_size, image_size), batch_size=bs)
     datamodule.setup()
 
     generate_image(pl_module=pl_module,

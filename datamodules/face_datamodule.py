@@ -11,7 +11,8 @@ class FaceDataModule(LightningDataModule):
             dataset_path,
             img_size=(48, 48),
             seed=42,
-            batch_size=32
+            batch_size=32,
+            transforms_setting=None
     ):
         super().__init__()
 
@@ -23,6 +24,11 @@ class FaceDataModule(LightningDataModule):
         self.img_size = img_size
         self.seed = seed
         self.batch_size = batch_size
+        if transforms_setting is None:
+            self.transform = transforms.Compose([transforms.Resize(self.img_size),
+                                            transforms.ToTensor()])
+        else:
+            self.transform = transforms_setting
 
     @property
     def num_classes(self):
@@ -31,13 +37,12 @@ class FaceDataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            transform = transforms.Compose([transforms.Resize(self.img_size),
-                                            transforms.ToTensor()])
+
 
             # load dataset
-            train_base = datasets.ImageFolder(f'{self.dataset_path}train', transform=transform)
-            val_base = datasets.ImageFolder(f'{self.dataset_path}valid', transform=transform)
-            test_base = datasets.ImageFolder(f'{self.dataset_path}test', transform=transform)
+            train_base = datasets.ImageFolder(f'{self.dataset_path}train', transform=self.transform)
+            val_base = datasets.ImageFolder(f'{self.dataset_path}valid', transform=self.transform)
+            test_base = datasets.ImageFolder(f'{self.dataset_path}test', transform=self.transform)
 
             self.data_train = WrapperDataset(train_base)
             self.data_val = WrapperDataset(val_base)
