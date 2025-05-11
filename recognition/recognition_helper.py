@@ -31,8 +31,6 @@ def same_config(config1, config2, skip_keys=[]):
 
 
 def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn, root):
-    print('------------------------------------------')
-    print(backbone_name)
     if backbone_name == 'ir_101' and dataset_name == 'webface4m' and loss_fn == 'adaface':
         _name, _id = 'adaface_ir101_webface4m.ckpt', '18jQkqB0avFqWa0Pas52g54xNshUOQJpQ'
     elif backbone_name == 'ir_50' and dataset_name == 'webface4m' and loss_fn == 'adaface':
@@ -42,7 +40,7 @@ def download_ir_pretrained_statedict(backbone_name, dataset_name, loss_fn, root)
     checkpoint_path = os.path.join(root, 'pretrained_models', _name)
 
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
-    print('path: '+checkpoint_path)
+    print('pretrained_models path: '+checkpoint_path)
     if not os.path.isfile(checkpoint_path):
         subprocess.check_call([sys.executable, "-m", "pip", "install", 'gdown'])
         try:
@@ -242,8 +240,6 @@ def make_recognition_model(recognition_config, root, enable_training=False):
         raise NotImplementedError()
 
     head = return_head(head_name=recognition_config["head_name"])
-    print('.....................................................................')
-    print(recognition_config)
 
     if recognition_config["ckpt_path"]:
         statedict = torch.load(recognition_config["ckpt_path"], map_location='cpu')['state_dict']

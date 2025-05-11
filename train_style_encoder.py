@@ -5,36 +5,46 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms, models
+from torch import flatten
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from datamodules.face_datamodule import FaceDataModule
-from recognition.external_mapping import ExternalMappingV4Dropout
+from recognition.external_mapping import make_external_mapping
 from recognition.recognition_helper import RecognitionModel, make_recognition_model
 
-import warnings
-warnings.filterwarnings("ignore", message="Could not find the number of physical cores")
 
 class StyleEncoderContrastive(nn.Module):
-    def __init__(self, external_mapping, z_dim=64, num_classes=7):
+    def __init__(self, external_mapping, batch_size=8, channels=64, features=26,  num_classes=7):
+        # features is K*k +1 which here k is 5
         super(StyleEncoderContrastive, self).__init__()
         self.external_mapping = external_mapping
+        self.batch_size = batch_size
 
         self.classifier = nn.Sequential(
-            nn.Linear(z_dim, 256),
-            nn.BatchNorm1d(256),
+            nn.Linear(channels, 512),
+            nn.BatchNorm1d(features),
             nn.ReLU(),
             nn.Dropout(0.3),
+
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(features),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+
             nn.Linear(256, 128),
-            nn.BatchNorm1d(128),
+            nn.BatchNorm1d(features),
             nn.ReLU(),
             nn.Dropout(0.3),
+
             nn.Linear(128, num_classes)
         )
 
     def forward(self, features):
-        z = self.external_mapping(features)  # z: (B, seq_len, z_dim)
-        z = z.mean(dim=1)  # Global average pooling → (B, z_dim)
+        # features[0] shape: torch.Size([8, 64, 56, 56])
+        z = self.external_mapping(features)  # spatial: (B, C, H, W)
+        # z shape: torch.Size([8, 26, 512])
 
         logits = self.classifier(z)
         return logits, z
@@ -42,35 +52,38 @@ class StyleEncoderContrastive(nn.Module):
 
 # Example usage:
 if __name__ == "__main__":
-
+    # load configs and initialize hyper parameter
     with open('config/config.json') as f:
         cfg = json.load(f)
 
     with open('config/general.json') as f:
         general_cfg = json.load(f)
 
+    device = torch.device(cfg.get("device", "cuda" if torch.cuda.is_available() else "cpu"))
     root = cfg['root']
-
     dirc = root + cfg['style_ckpt_path']
-
     if not os.path.exists(dirc):
         os.makedirs(dirc)
 
     PATH = dirc + '/external_mapping_model.pth'
+    batch_size = 8
+    channels = general_cfg['external_mapping']["out_channel"]
+    num_classes = cfg['num_classes']
+    lr = 2e-3
 
-    # external_mapping
-    external_mapping = ExternalMappingV4Dropout(return_spatial=[2], out_size=(16, 16), out_channel=64)
-    model = StyleEncoderContrastive(external_mapping)
-
-    # recognition model, it's frozen
+    # initialize model and style encoder
     recognition = general_cfg['recognition']
     recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
     recognition['center_path'] = os.path.join(root, recognition['center_path'])
-    recognition_model: RecognitionModel = make_recognition_model(recognition, root, enable_training=False)
+    recognition_model: RecognitionModel = make_recognition_model(recognition, root, enable_training=False).to(device)
 
+    external_mapping = make_external_mapping(general_cfg['external_mapping'], general_cfg['unet_config']).to(device)
+    model = StyleEncoderContrastive(external_mapping, batch_size=batch_size, channels=channels, num_classes=num_classes).to(device)
+
+    # Load dataset
     dataset_path = os.path.join(root, cfg["dataset_path"])
     transforms_setting = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((cfg["image_size"], cfg["image_size"])),
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1),
         transforms.ToTensor(),
@@ -78,66 +91,69 @@ if __name__ == "__main__":
     ])
 
     datamodule = FaceDataModule(dataset_path=dataset_path,
-                                img_size=(cfg["image_size"], cfg["image_size"]),
-                                batch_size=8, transforms_setting=transforms_setting)
+                                batch_size=batch_size, transforms_setting=transforms_setting)
     datamodule.setup()
     train_dataloader = datamodule.train_dataloader()
     val_dataloader = datamodule.val_dataloader()
 
-    mse_loss_fn = nn.MSELoss()
+    # set an optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
     loss_history = []
     val_loss_history = []
     val_acc_history = []
 
     best_val_loss = float('inf')
-    patience = 3
-    patience_counter = 0
 
-    for batch in train_dataloader:
-        _, spatial = recognition_model(batch["exp_img"])
+    num_epochs = 10
+    for epoch in range(num_epochs):
+        # Train model
+        print(f"\nEpoch {epoch+1}/{num_epochs}")
+        model.train()
+        train_pbar = tqdm(train_dataloader, desc="Training", ncols=100)
+        for batch in train_pbar:
+            batch = {k: v.to(device) for k, v in batch.items()}
 
-        logits, embedding = model(spatial)  # خروجی (B, 7), (B, z_dim)
-        labels = batch['target_label']  # لیبل 7 کلاسه
-
-        ce_loss = F.cross_entropy(logits, labels)
-        one_hot = F.one_hot(labels, num_classes=7).float().to(embedding.device)
-        padded_one_hot = F.pad(one_hot, (0, embedding.shape[1] - one_hot.shape[1]))
-        mse_loss = mse_loss_fn(embedding, padded_one_hot)
-        loss = ce_loss + 0.1 * mse_loss
-        loss.backward()
-
-        loss_history.append(loss.item())
-        print("Loss:", loss.item())
-
-    torch.save(external_mapping.state_dict(), PATH)
-
-    # === validation ===
-    with torch.no_grad():
-        for batch in val_dataloader:
             _, spatial = recognition_model(batch["exp_img"])
-            logits, embedding = model(spatial)
-            labels = batch['target_label']
+            logits, _ = model(spatial)
+            labels = F.one_hot(batch['target_label'], num_classes=num_classes)
 
             ce_loss = F.cross_entropy(logits, labels)
-            val_loss = ce_loss.item()
-            val_loss_history.append(val_loss)
+            ce_loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
+            loss_history.append(ce_loss.item())
             preds = torch.argmax(logits, dim=1)
             acc = (preds == labels).float().mean().item()
-            val_acc_history.append(acc)
+            train_pbar.set_postfix({"Loss": f"{ce_loss.item():.4f}", "Acc": f"{acc:.4f}"})
 
-            # Early Stopping Check
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                patience_counter = 0
-                torch.save(model.state_dict(), PATH.replace(".pth", "_best.pth"))
-                print(f"New best model saved with val_loss = {val_loss:.4f}")
-            else:
-                patience_counter += 1
-                print(f"No improvement. Patience: {patience_counter}/{patience}")
-                if patience_counter >= patience:
-                    print("Early stopping triggered.")
-                    break
+        torch.save(external_mapping.state_dict(), PATH)
+
+        # Eval model
+        model.eval()
+        with torch.no_grad():
+            val_pbar = tqdm(val_dataloader, desc="Validation", ncols=100)
+            for batch in val_pbar:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                _, spatial = recognition_model(batch["exp_img"])
+                logits, _ = model(spatial)
+                labels = F.one_hot(batch['target_label'], num_classes=num_classes)
+
+                ce_loss = F.cross_entropy(logits, labels)
+                val_loss = ce_loss.item()
+                val_loss_history.append(val_loss)
+
+                preds = torch.argmax(logits, dim=1)
+                acc = (preds == labels).float().mean().item()
+                val_acc_history.append(acc)
+
+                val_pbar.set_postfix({"ValLoss": f"{val_loss:.4f}", "ValAcc": f"{acc:.4f}"})
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), PATH.replace(".pth", "_best.pth"))
+
 
     # === loss , accuracy plots ===
     plt.figure(figsize=(10, 5))
@@ -167,6 +183,7 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         for batch in val_dataloader:
+            batch = {k: v.to(device) for k, v in batch.items()}
             _, spatial = recognition_model(batch["exp_img"])
             _, embedding = model(spatial)
             all_embeddings.append(embedding.cpu())
@@ -175,7 +192,8 @@ if __name__ == "__main__":
     embeddings = torch.cat(all_embeddings, dim=0).numpy()
     labels = torch.cat(all_labels, dim=0).numpy()
 
-    tsne = TSNE(n_components=2, perplexity=6, random_state=42)
+    perplexity = min(30, len(embeddings) - 1)
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42)
     reduced = tsne.fit_transform(embeddings)
 
     plt.figure(figsize=(8, 6))
