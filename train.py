@@ -17,7 +17,7 @@ from utils.os_utils import get_latest_file
 epochs = 30
 n_steps = 1000
 use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
-continue_training = False # Training of Trainer
+continue_training = True # Training of Trainer
 
 
 def training(cfg, general_cfg):
@@ -45,29 +45,20 @@ def training(cfg, general_cfg):
 
     model_ckpt_path = root + cfg["ckpt_path"]
 
-    # use pretrain MyModelTrainer
-    if continue_training:
-        print('loading checkpoint in initalization from ', model_ckpt_path, '...............')
-        name = get_latest_file(model_ckpt_path)
-        print(name)
-        model_ckpt_path = os.path.join(model_ckpt_path, name)
-        model = MyModelTrainer.load_from_checkpoint(model_ckpt_path)
-
-    else:
-        model = MyModelTrainer(unet_config=general_cfg['unet_config'],
-                               use_pretrained=use_pretrained,
-                               lr=cfg['lr'],
-                               recognition=general_cfg['recognition'],
-                               recognition_eval=general_cfg['recognition_eval'],
-                               label_mapping=general_cfg['label_mapping'],
-                               external_mapping=general_cfg['external_mapping'],
-                               pretrained_style_path=cfg['style_ckpt_path'],
-                               output_dir=cfg["output_dir"],
-                               mse_loss_lambda=cfg["mse_loss_lambda"],
-                               identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
-                               sampler=general_cfg['sampler'],
-                               device=device,
-                               root=root)
+    model = MyModelTrainer(unet_config=general_cfg['unet_config'],
+                           use_pretrained=use_pretrained,
+                           lr=cfg['lr'],
+                           recognition=general_cfg['recognition'],
+                           recognition_eval=general_cfg['recognition_eval'],
+                           label_mapping=general_cfg['label_mapping'],
+                           external_mapping=general_cfg['external_mapping'],
+                           pretrained_style_path=cfg['style_ckpt_path'],
+                           output_dir=cfg["output_dir"],
+                           mse_loss_lambda=cfg["mse_loss_lambda"],
+                           identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
+                           sampler=general_cfg['sampler'],
+                           device=device,
+                           root=root)
 
     print("Instantiating callbacks...")
     callbacks = create_list_of_callbacks(model_ckpt_path)
@@ -92,8 +83,15 @@ def training(cfg, general_cfg):
 
     if cfg["training"]:
         print("Starting training...")
-
-        trainer.fit(model=model, datamodule=datamodule)
+        # use pretrain MyModelTrainer
+        if continue_training:
+            print('loading checkpoint in initalization from ', model_ckpt_path, '...............')
+            name = get_latest_file(model_ckpt_path)
+            print(name)
+            model_ckpt_path = os.path.join(model_ckpt_path, name)
+            trainer.fit(model=model, datamodule=datamodule, ckpt_path=model_ckpt_path)
+        else:
+            trainer.fit(model=model, datamodule=datamodule)
         trainer.save_checkpoint(f"{model_ckpt_path}/final.ckpt")
 
     train_metrics = trainer.callback_metrics
