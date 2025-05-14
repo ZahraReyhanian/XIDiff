@@ -16,25 +16,23 @@ from recognition.recognition_helper import RecognitionModel, make_recognition_mo
 
 
 class StyleEncoderContrastive(nn.Module):
-    def __init__(self, external_mapping, batch_size=8, channels=64, features=26,  num_classes=7):
+    def __init__(self, external_mapping, channels=512, features=26,  num_classes=7):
         # features is K*k +1 which here k is 5
         super(StyleEncoderContrastive, self).__init__()
         self.external_mapping = external_mapping
-        self.batch_size = batch_size
+        self.channels = channels
+        self.features = features
 
         self.classifier = nn.Sequential(
-            nn.Linear(channels, 512),
-            nn.BatchNorm1d(features),
+            nn.Linear(channels*features, 512),
             nn.ReLU(),
             nn.Dropout(0.3),
 
             nn.Linear(512, 256),
-            nn.BatchNorm1d(features),
             nn.ReLU(),
             nn.Dropout(0.3),
 
             nn.Linear(256, 128),
-            nn.BatchNorm1d(features),
             nn.ReLU(),
             nn.Dropout(0.3),
 
@@ -43,8 +41,13 @@ class StyleEncoderContrastive(nn.Module):
 
     def forward(self, features):
         # features[0] shape: torch.Size([8, 64, 56, 56])
+        # print("feature[0] shape: ", features[0].shape)
         z = self.external_mapping(features)  # spatial: (B, C, H, W)
+
+        # print("z shape", z.shape)
         # z shape: torch.Size([8, 26, 512])
+        z = z.reshape(-1, self.channels*self.features)
+        # print("z shape", z.shape)
 
         logits = self.classifier(z)
         return logits, z
@@ -66,10 +69,16 @@ if __name__ == "__main__":
         os.makedirs(dirc)
 
     PATH = dirc + '/external_mapping_model.pth'
+    PATH_model = dirc + '/style_model.pth'
     batch_size = 8
     channels = general_cfg['external_mapping']["out_channel"]
+    dim = general_cfg['external_mapping']["spatial_dim"]
+    features = dim*dim + 1
     num_classes = cfg['num_classes']
     lr = 2e-3
+    num_epochs = 50
+    step_size = 5
+    gamma = 0.5
 
     # initialize model and style encoder
     recognition = general_cfg['recognition']
@@ -78,26 +87,30 @@ if __name__ == "__main__":
     recognition_model: RecognitionModel = make_recognition_model(recognition, root, enable_training=False).to(device)
 
     external_mapping = make_external_mapping(general_cfg['external_mapping'], general_cfg['unet_config']).to(device)
-    model = StyleEncoderContrastive(external_mapping, batch_size=batch_size, channels=channels, num_classes=num_classes).to(device)
+    model = StyleEncoderContrastive(external_mapping,
+                                    channels=channels,
+                                    features=features,
+                                    num_classes=num_classes).to(device)
 
     # Load dataset
     dataset_path = os.path.join(root, cfg["dataset_path"])
-    transforms_setting = transforms.Compose([
-        transforms.Resize((cfg["image_size"], cfg["image_size"])),
-        transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ])
+    # transforms_setting = transforms.Compose([
+    #     transforms.Resize((cfg["image_size"], cfg["image_size"])),
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    # ])
 
     datamodule = FaceDataModule(dataset_path=dataset_path,
-                                batch_size=batch_size, transforms_setting=transforms_setting)
+                                batch_size=batch_size)
     datamodule.setup()
     train_dataloader = datamodule.train_dataloader()
     val_dataloader = datamodule.val_dataloader()
 
-    # set an optimizer
+    # set an optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
 
     loss_history = []
     val_loss_history = []
@@ -105,10 +118,11 @@ if __name__ == "__main__":
 
     best_val_loss = float('inf')
 
-    num_epochs = 10
     for epoch in range(num_epochs):
         # Train model
         print(f"\nEpoch {epoch+1}/{num_epochs}")
+        mean_train_loss = 0
+        corrects = 0
         model.train()
         train_pbar = tqdm(train_dataloader, desc="Training", ncols=100)
         for batch in train_pbar:
@@ -116,43 +130,64 @@ if __name__ == "__main__":
 
             _, spatial = recognition_model(batch["exp_img"])
             logits, _ = model(spatial)
-            labels = F.one_hot(batch['target_label'], num_classes=num_classes)
+            labels = F.one_hot(batch['target_label'], num_classes=num_classes).float()
 
             ce_loss = F.cross_entropy(logits, labels)
+            optimizer.zero_grad()
             ce_loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
 
-            loss_history.append(ce_loss.item())
+            train_loss = ce_loss.item()
+            mean_train_loss += train_loss
+
             preds = torch.argmax(logits, dim=1)
-            acc = (preds == labels).float().mean().item()
-            train_pbar.set_postfix({"Loss": f"{ce_loss.item():.4f}", "Acc": f"{acc:.4f}"})
+            corrects += (preds == batch['target_label']).float().sum()
+            train_pbar.set_postfix({"Loss": f"{train_loss:.4f}", "lr": optimizer.param_groups[0]["lr"]})
 
-        torch.save(external_mapping.state_dict(), PATH)
+        mean_train_loss = mean_train_loss / len(train_dataloader)
+        loss_history.append(mean_train_loss)
+        print("Mean of Train loss:", mean_train_loss)
+
+        accuracy = 100 * corrects / len(datamodule.data_train)
+        print("Accuracy = {}".format(accuracy))
+        if epoch < 30:
+            scheduler.step()
 
         # Eval model
         model.eval()
+        mean_val_loss = 0
+        corrects = 0
+
         with torch.no_grad():
             val_pbar = tqdm(val_dataloader, desc="Validation", ncols=100)
             for batch in val_pbar:
                 batch = {k: v.to(device) for k, v in batch.items()}
                 _, spatial = recognition_model(batch["exp_img"])
                 logits, _ = model(spatial)
-                labels = F.one_hot(batch['target_label'], num_classes=num_classes)
+                labels = F.one_hot(batch['target_label'], num_classes=num_classes).float()
 
                 ce_loss = F.cross_entropy(logits, labels)
                 val_loss = ce_loss.item()
-                val_loss_history.append(val_loss)
+                mean_val_loss += val_loss
 
                 preds = torch.argmax(logits, dim=1)
-                acc = (preds == labels).float().mean().item()
-                val_acc_history.append(acc)
+                corrects += (preds == batch['target_label']).float().sum().item()
 
-                val_pbar.set_postfix({"ValLoss": f"{val_loss:.4f}", "ValAcc": f"{acc:.4f}"})
 
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), PATH.replace(".pth", "_best.pth"))
+                val_pbar.set_postfix({"ValLoss": f"{val_loss:.4f}"})
+
+            mean_val_loss = mean_val_loss/len(val_dataloader)
+            val_loss_history.append(mean_val_loss)
+            print("Mean of validation loss:", mean_val_loss)
+
+            accuracy = 100 * corrects / len(datamodule.data_val)
+            print("Accuracy = {}".format(accuracy))
+            val_acc_history.append(accuracy)
+
+        if mean_val_loss < best_val_loss:
+            best_val_loss = mean_val_loss
+            torch.save(external_mapping.state_dict(), PATH.replace(".pth", "_best.pth"))
+            torch.save(model.state_dict(), PATH_model)
 
 
     # === loss , accuracy plots ===
@@ -161,7 +196,7 @@ if __name__ == "__main__":
     plt.plot(val_loss_history, label='Validation Loss')
     plt.xlabel('Batch')
     plt.ylabel('Loss')
-    plt.title('Loss over Batches')
+    plt.title('Loss over Epochs')
     plt.legend()
     plt.grid(True)
     plt.savefig('loss.png')
@@ -171,7 +206,7 @@ if __name__ == "__main__":
     plt.plot(val_acc_history, label='Validation Accuracy', color='green')
     plt.xlabel('Batch')
     plt.ylabel('Accuracy')
-    plt.title('Validation Accuracy over Batches')
+    plt.title('Validation Accuracy over Epochs')
     plt.legend()
     plt.grid(True)
     plt.savefig('Accuracy.png')

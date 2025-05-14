@@ -45,6 +45,7 @@ class Trainer(pl.LightningModule):
                  use_ema=True,
                  device=None,
                  use_pretrained=False,
+                 pretrained_style_path=None,
                  image_size=112,
                  root='',
                  *args, **kwargs
@@ -74,8 +75,6 @@ class Trainer(pl.LightningModule):
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
         recognition_eval['center_path'] = os.path.join(root, recognition_eval['center_path'])
-        print('++++++++++++++++++------------------')
-        print(recognition['ckpt_path'])
 
         self.model = model_helper.make_unet(unet_config)
         self.ema_model = EMAModel(self.model, inv_gamma=1.0, power=3 / 4, max_value=0.9999)
@@ -111,11 +110,15 @@ class Trainer(pl.LightningModule):
 
         self.external_mapping = make_external_mapping(external_mapping, unet_config)
 
+        if pretrained_style_path:
+            pretrained_style_path = os.path.join(root, pretrained_style_path)
+            self.external_mapping.load_state_dict(torch.load(pretrained_style_path, weights_only=True))
+
 
         if use_pretrained: #use pretrained unet
             ckpt_path = os.path.join(root, unet_config['params']['pretrained_model_path'])
 
-            statedict = torch.load(ckpt_path, map_location='cpu')
+            statedict = torch.load(ckpt_path, map_location='cpu', weights_only=True)
             self.model.load_state_dict(statedict, strict=True)
 
 

@@ -14,10 +14,10 @@ from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
 from utils.os_utils import get_latest_file
 
-epochs = 100
+epochs = 30
 n_steps = 1000
-use_pretrained = True  # True: Finetune unet, False: Train from 0 unet
-continue_training = False
+use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
+continue_training = False # Training of Trainer
 
 
 def training(cfg, general_cfg):
@@ -61,6 +61,7 @@ def training(cfg, general_cfg):
                                recognition_eval=general_cfg['recognition_eval'],
                                label_mapping=general_cfg['label_mapping'],
                                external_mapping=general_cfg['external_mapping'],
+                               pretrained_style_path=cfg['style_ckpt_path'],
                                output_dir=cfg["output_dir"],
                                mse_loss_lambda=cfg["mse_loss_lambda"],
                                identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
@@ -71,10 +72,10 @@ def training(cfg, general_cfg):
     print("Instantiating callbacks...")
     callbacks = create_list_of_callbacks(model_ckpt_path)
 
-    print("Instantiating loggers...")
+    # print("Instantiating loggers...")
     # logger = WandbLogger(project=cfg["project"], log_model='all', id=cfg["id"], save_dir=cfg["log_dir"], )
     print("before train.....................................................................")
-    strategy = DDPStrategy(find_unused_parameters=True)
+    strategy = DDPStrategy(find_unused_parameters=False)
     trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks,
                          strategy=strategy, max_epochs=epochs,
                          # logger=logger
