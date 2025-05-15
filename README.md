@@ -1,1 +1,3 @@
-# cddpm
+# XIDiff
+
+Expression + Identity + Diffusion
