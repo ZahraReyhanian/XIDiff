@@ -6,6 +6,8 @@ from utils.generation_utils import generate_image
 import re
 import json
 
+from utils.os_utils import get_latest_file
+
 image_size = 256
 
 def natural_sort(l):
@@ -20,22 +22,25 @@ def main():
 
     root = cfg['root']
 
-    ckpt = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
-    model_hparam = ckpt['hyper_parameters']
-    model_hparam['unet_config']['params']['pretrained_model_path'] = None
-    model_hparam['_target_'] = 'src.trainer.Trainer'
-    model_hparam['_partial_'] = True
+    ## config from dcface
+    # ckpt = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
+    # model_hparam = ckpt['hyper_parameters']
+    # model_hparam['unet_config']['params']['pretrained_model_path'] = None
+    # model_hparam['_target_'] = 'src.trainer.Trainer'
+    # model_hparam['_partial_'] = True
 
     # load pl_module
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    last = True
 
-    pl_module = MyModelTrainer(**model_hparam, ckpt_path=cfg['ckpt_path'], last=last, device=device, root=root)
-    print('Instantiated ', model_hparam['_target_'])
-    # load model
+    # get checkpoint path
+    model_ckpt_path = root + cfg["ckpt_path"]
+    name = get_latest_file(model_ckpt_path)
+    print(name)
+    checkpoint_path = os.path.join(model_ckpt_path, name)
+    print("loading from: ", checkpoint_path)
 
-    pl_module.load_state_dict(ckpt['state_dict'], strict=True)
+    pl_module = MyModelTrainer.load_from_checkpoint(checkpoint_path=checkpoint_path)
     pl_module.to('cuda')
     pl_module.eval()
 
