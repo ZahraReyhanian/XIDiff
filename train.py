@@ -52,7 +52,7 @@ def training(cfg, general_cfg):
                            recognition_eval=general_cfg['recognition_eval'],
                            label_mapping=general_cfg['label_mapping'],
                            external_mapping=general_cfg['external_mapping'],
-                           pretrained_style_path=cfg['style_ckpt_path'],
+                           pretrained_style_path=cfg['style_ckpt_path']+"/"+cfg['name_style_ckpt'],
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
@@ -88,8 +88,8 @@ def training(cfg, general_cfg):
             print('loading checkpoint in initalization from ', model_ckpt_path, '...............')
             name = get_latest_file(model_ckpt_path)
             print(name)
-            model_ckpt_path = os.path.join(model_ckpt_path, name)
-            trainer.fit(model=model, datamodule=datamodule, ckpt_path=model_ckpt_path)
+            model_ckpt_path_name = os.path.join(model_ckpt_path, name)
+            trainer.fit(model=model, datamodule=datamodule, ckpt_path=model_ckpt_path_name)
         else:
             trainer.fit(model=model, datamodule=datamodule)
         trainer.save_checkpoint(f"{model_ckpt_path}/final.ckpt")
