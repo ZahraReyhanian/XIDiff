@@ -6,9 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms, models
 from torch import flatten
-from sklearn.manifold import TSNE
+import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from sklearn.metrics import classification_report
+from sklearn.manifold import TSNE
 
 from datamodules.face_datamodule import FaceDataModule
 from recognition.external_mapping import make_external_mapping
@@ -16,37 +18,64 @@ from recognition.recognition_helper import RecognitionModel, make_recognition_mo
 
 continue_training = False
 
+class EarlyStopping:
+    def __init__(self, patience=5, delta=0):
+        self.patience = patience
+        self.delta = delta
+        self.best_score = None
+        self.early_stop = False
+        self.counter = 0
+        self.best_model_state = None
+
+    def __call__(self, val_loss, model):
+        score = -val_loss
+        if self.best_score is None:
+            self.best_score = score
+            self.best_model_state = model.state_dict()
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.best_model_state = model.state_dict()
+            self.counter = 0
+
+    def load_best_model(self, model):
+        model.load_state_dict(self.best_model_state)
+
 class StyleEncoderContrastive(nn.Module):
-    def __init__(self, external_mapping, channels=512, features=26, num_classes=7, batch_size=16):
-        # features is K*k +1 which here k is 5
+    def __init__(self, external_mapping, channels=512, features=26, num_classes=7):
         super(StyleEncoderContrastive, self).__init__()
         self.external_mapping = external_mapping
         self.channels = channels
         self.features = features
 
-        # Global Average Pooling
         self.global_pool = nn.AdaptiveAvgPool1d(1)  # convert (B, C, T) to (B, C)
-        self.dim = 128
 
         self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.BatchNorm1d(self.features * batch_size),
-            nn.Linear(self.features * batch_size, self.dim),
+            nn.BatchNorm1d(features * features),
+            nn.Linear(features * features, 512),
             nn.ReLU(),
             nn.Dropout(0.3),
 
-            nn.BatchNorm1d(self.dim),
-            nn.Linear(self.dim, num_classes)
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+
+            nn.BatchNorm1d(256),
+            nn.Linear(256, num_classes)
         )
 
     def forward(self, features):
-        # features[0] shape: torch.Size([16, 64, 56, 56])
-        z = self.external_mapping(features)  # spatial: (B, C, H, W)
-        # z shape: torch.Size([16, 26, 512])
-        z_t = z.transpose(1, 2)
-        z_pooled = self.global_pool(z_t).squeeze(-1)
+        z = self.external_mapping(features)  # shape: (B, 26, 512)
+        z_t = z.transpose(1, 2)  # (B, 512, 26)
+        z_pooled = self.global_pool(z_t).squeeze(-1)  # (B, 512)
 
-        z_out = z@z_pooled.T
+        z_out = torch.bmm(z, z_pooled.unsqueeze(2)).squeeze(-1)  # (B, 26)
+        z_out = torch.bmm(z_out.unsqueeze(2), z_out.unsqueeze(1))  # (B, 26, 26)
+        z_out = z_out.view(z_out.size(0), -1)  # Flatten to (B, 676)
 
         logits = self.classifier(z_out)
         return logits, z_out
@@ -95,11 +124,13 @@ if __name__ == "__main__":
                                     channels=channels,
                                     features=features,
                                     num_classes=num_classes,
-                                    batch_size=batch_size).to(device)
+                                    # batch_size=batch_size
+                                    ).to(device)
 
     # set an optimizer and scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=factor, patience=patience)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=factor, patience=patience, min_lr=1e-6)
+    early_stopping = EarlyStopping(patience=10, delta=0.01)
 
     if continue_training:
         print('loading model from:', PATH_model)
@@ -121,7 +152,8 @@ if __name__ == "__main__":
     datamodule.setup()
     train_dataloader = datamodule.train_dataloader()
     val_dataloader = datamodule.val_dataloader()
-
+    test_dataloader = datamodule.test_dataloader()
+    print(model)
 
     for epoch in range(s_epoch, num_epochs):
         # Train model
@@ -133,9 +165,9 @@ if __name__ == "__main__":
         for batch in train_pbar:
             batch = {k: v.to(device) for k, v in batch.items()}
 
-            _, spatial = recognition_model(batch["exp_img"])
+            _, spatial = recognition_model(batch["id_img"])
             logits, _ = model(spatial)
-            labels = F.one_hot(batch['target_label'], num_classes=num_classes).float()
+            labels = F.one_hot(batch['src_label'], num_classes=num_classes).float()
 
             ce_loss = F.cross_entropy(logits, labels)
             optimizer.zero_grad()
@@ -146,7 +178,7 @@ if __name__ == "__main__":
             mean_train_loss += train_loss
 
             preds = torch.argmax(logits, dim=1)
-            corrects += (preds == batch['target_label']).float().sum().item()
+            corrects += (preds == batch['src_label']).float().sum().item()
             train_pbar.set_postfix({"Loss": f"{train_loss:.4f}", "lr": optimizer.param_groups[0]["lr"]})
 
         mean_train_loss = mean_train_loss / len(train_dataloader)
@@ -166,16 +198,16 @@ if __name__ == "__main__":
             val_pbar = tqdm(val_dataloader, desc="Validation", ncols=100)
             for batch in val_pbar:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                _, spatial = recognition_model(batch["exp_img"])
+                _, spatial = recognition_model(batch["id_img"])
                 logits, _ = model(spatial)
-                labels = F.one_hot(batch['target_label'], num_classes=num_classes).float()
+                labels = F.one_hot(batch['src_label'], num_classes=num_classes).float()
 
                 ce_loss = F.cross_entropy(logits, labels)
                 val_loss = ce_loss.item()
                 mean_val_loss += val_loss
 
                 preds = torch.argmax(logits, dim=1)
-                corrects += (preds == batch['target_label']).float().sum().item()
+                corrects += (preds == batch['src_label']).float().sum().item()
 
 
                 val_pbar.set_postfix({"ValLoss": f"{val_loss:.4f}"})
@@ -207,6 +239,29 @@ if __name__ == "__main__":
                     'scheduler': scheduler
                     }, PATH_model)
 
+        early_stopping(val_loss, model)
+        if early_stopping.early_stop:
+            print("Early stopping")
+            break
+
+    early_stopping.load_best_model(model)
+
+    # Final evaluation on the test set
+    model.eval()
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        for batch in test_dataloader:
+            batch = {k: v.to(device) for k, v in batch.items()}
+            _, spatial = recognition_model(batch["id_img"])
+            logits, _ = model(spatial)
+
+            preds = torch.argmax(logits, dim=1)
+
+            y_true+=batch['src_label'].cpu()
+            y_pred+=preds.cpu()
+
+    print(classification_report(y_true, y_pred))
 
     # === loss , accuracy plots ===
     plt.figure(figsize=(10, 5))
@@ -231,17 +286,17 @@ if __name__ == "__main__":
     plt.savefig('Accuracy.png')
     plt.close()
 
-    # === t-SNE visualization ===
+    # === TODO t-SNE visualization ===
     all_embeddings = []
     all_labels = []
 
     with torch.no_grad():
         for batch in val_dataloader:
             batch = {k: v.to(device) for k, v in batch.items()}
-            _, spatial = recognition_model(batch["exp_img"])
+            _, spatial = recognition_model(batch["id_img"])
             _, embedding = model(spatial)
             all_embeddings.append(embedding.cpu())
-            all_labels.append(batch['target_label'].cpu())
+            all_labels.append(batch['src_label'].cpu())
 
     embeddings = torch.cat(all_embeddings, dim=0).numpy()
     labels = torch.cat(all_labels, dim=0).numpy()
