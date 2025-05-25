@@ -12,6 +12,7 @@ class FaceDataModule(LightningDataModule):
             img_size=(48, 48),
             seed=42,
             batch_size=32,
+            num_workers=8,
             transforms_setting=None
     ):
         super().__init__()
@@ -24,9 +25,11 @@ class FaceDataModule(LightningDataModule):
         self.img_size = img_size
         self.seed = seed
         self.batch_size = batch_size
+        self.num_workers = num_workers
         if transforms_setting is None:
             self.transform = transforms.Compose([transforms.Resize(self.img_size),
-                                            transforms.ToTensor()])
+                                                 transforms.ToTensor(),
+                                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         else:
             self.transform = transforms_setting
 
@@ -53,7 +56,7 @@ class FaceDataModule(LightningDataModule):
             dataset=self.data_train,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=11,
+            num_workers=self.num_workers,
             drop_last=True
         )
 
@@ -62,7 +65,7 @@ class FaceDataModule(LightningDataModule):
             dataset=self.data_val,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=11,
+            num_workers=self.num_workers,
             drop_last=True
         )
 

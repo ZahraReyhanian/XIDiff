@@ -17,7 +17,7 @@ from utils.os_utils import get_latest_file
 epochs = 30
 n_steps = 1000
 use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
-continue_training = True # Training of Trainer
+continue_training = False # Training of Trainer
 
 
 def training(cfg, general_cfg):
@@ -65,7 +65,6 @@ def training(cfg, general_cfg):
 
     # print("Instantiating loggers...")
     # logger = WandbLogger(project=cfg["project"], log_model='all', id=cfg["id"], save_dir=cfg["log_dir"], )
-    print("before train.....................................................................")
     strategy = DDPStrategy(find_unused_parameters=False)
     trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks,
                          strategy=strategy, max_epochs=epochs,

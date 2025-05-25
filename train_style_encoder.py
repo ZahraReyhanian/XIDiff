@@ -45,40 +45,39 @@ class EarlyStopping:
         model.load_state_dict(self.best_model_state)
 
 class StyleEncoderContrastive(nn.Module):
-    def __init__(self, external_mapping, channels=512, features=26, num_classes=7):
+    def __init__(self, external_mapping, channels=512, features=26,  num_classes=7):
+        # features is K*k +1 which here k is 5
         super(StyleEncoderContrastive, self).__init__()
         self.external_mapping = external_mapping
         self.channels = channels
         self.features = features
-
-        self.global_pool = nn.AdaptiveAvgPool1d(1)  # convert (B, C, T) to (B, C)
+        self.flatten = nn.Flatten()
 
         self.classifier = nn.Sequential(
-            nn.BatchNorm1d(features * features),
-            nn.Linear(features * features, 512),
+            nn.Linear(channels*features, 512),
             nn.ReLU(),
             nn.Dropout(0.3),
 
-            nn.BatchNorm1d(512),
             nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
 
-            nn.BatchNorm1d(256),
-            nn.Linear(256, num_classes)
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+
+            nn.Linear(128, num_classes)
         )
 
     def forward(self, features):
-        z = self.external_mapping(features)  # shape: (B, 26, 512)
-        z_t = z.transpose(1, 2)  # (B, 512, 26)
-        z_pooled = self.global_pool(z_t).squeeze(-1)  # (B, 512)
+        # features[0] shape: torch.Size([8, 64, 56, 56])
 
-        z_out = torch.bmm(z, z_pooled.unsqueeze(2)).squeeze(-1)  # (B, 26)
-        z_out = torch.bmm(z_out.unsqueeze(2), z_out.unsqueeze(1))  # (B, 26, 26)
-        z_out = z_out.view(z_out.size(0), -1)  # Flatten to (B, 676)
+        z = self.external_mapping(features)  # spatial: (B, C, H, W)
+        # z shape: torch.Size([8, 26, 512])
+        z = self.flatten(z)
 
-        logits = self.classifier(z_out)
-        return logits, z_out
+        logits = self.classifier(z)
+        return logits, z
 
 
 if __name__ == "__main__":
@@ -229,7 +228,7 @@ if __name__ == "__main__":
         if epoch%5==0:
             torch.save(external_mapping.state_dict(), f"{dirc}/external_mapping_{epoch}_epoch.pth")
 
-        torch.save({'epoch': epoch,
+        torch.save({'epoch': epoch+1,
                     'model_state_dict': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'loss_history': loss_history,
@@ -250,18 +249,40 @@ if __name__ == "__main__":
     model.eval()
     y_true = []
     y_pred = []
+
+    all_embeddings = []
+    all_labels = []
+
     with torch.no_grad():
-        for batch in test_dataloader:
+        for batch in tqdm(test_dataloader):
             batch = {k: v.to(device) for k, v in batch.items()}
             _, spatial = recognition_model(batch["id_img"])
-            logits, _ = model(spatial)
+            logits, embedding = model(spatial)
 
             preds = torch.argmax(logits, dim=1)
+            all_embeddings.append(embedding.cpu())
+            all_labels.append(batch['src_label'].cpu())
 
             y_true+=batch['src_label'].cpu()
             y_pred+=preds.cpu()
 
     print(classification_report(y_true, y_pred))
+
+    embeddings = torch.cat(all_embeddings, dim=0).numpy()
+    labels = torch.cat(all_labels, dim=0).numpy()
+
+    perplexity = min(10, len(embeddings) - 1)
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+    reduced = tsne.fit_transform(embeddings)
+
+    plt.figure(figsize=(8, 6))
+    for i in range(7):
+        idx = labels == i
+        plt.scatter(reduced[idx, 0], reduced[idx, 1], label=f'Class {i}', alpha=0.7)
+    plt.legend()
+    plt.title('t-SNE visualization of expression embeddings')
+    plt.savefig('tSNE.png')
+    plt.close()
 
     # === loss , accuracy plots ===
     plt.figure(figsize=(10, 5))
@@ -284,32 +305,4 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.savefig('Accuracy.png')
-    plt.close()
-
-    # === TODO t-SNE visualization ===
-    all_embeddings = []
-    all_labels = []
-
-    with torch.no_grad():
-        for batch in val_dataloader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            _, spatial = recognition_model(batch["id_img"])
-            _, embedding = model(spatial)
-            all_embeddings.append(embedding.cpu())
-            all_labels.append(batch['src_label'].cpu())
-
-    embeddings = torch.cat(all_embeddings, dim=0).numpy()
-    labels = torch.cat(all_labels, dim=0).numpy()
-
-    perplexity = min(30, len(embeddings) - 1)
-    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42)
-    reduced = tsne.fit_transform(embeddings)
-
-    plt.figure(figsize=(8, 6))
-    for i in range(7):
-        idx = labels == i
-        plt.scatter(reduced[idx, 0], reduced[idx, 1], label=f'Class {i}', alpha=0.7)
-    plt.legend()
-    plt.title('t-SNE visualization of expression embeddings')
-    plt.savefig('tSNE.png')
     plt.close()
