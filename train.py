@@ -15,7 +15,6 @@ from datamodules.face_datamodule import FaceDataModule
 from utils.os_utils import get_latest_file
 
 epochs = 30
-n_steps = 1000
 use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
 continue_training = False # Training of Trainer
 
@@ -43,7 +42,8 @@ def training(cfg, general_cfg):
     datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
-    model_ckpt_path = root + cfg["ckpt_path"]
+    modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
+    print(modelTrainer_path['hyper_parameters'])
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -52,15 +52,17 @@ def training(cfg, general_cfg):
                            recognition_eval=general_cfg['recognition_eval'],
                            label_mapping=general_cfg['label_mapping'],
                            external_mapping=general_cfg['external_mapping'],
-                           pretrained_style_path=cfg['style_ckpt_path']+"/"+cfg['name_style_ckpt'],
+                           # pretrained_style_path=cfg['style_ckpt_path']+"/"+cfg['name_style_ckpt'],
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
                            sampler=general_cfg['sampler'],
                            device=device,
                            root=root)
+    model.load_state_dict(modelTrainer_path['state_dict'], strict=True)
 
     print("Instantiating callbacks...")
+    model_ckpt_path = root + cfg["ckpt_path"]
     callbacks = create_list_of_callbacks(model_ckpt_path)
 
     # print("Instantiating loggers...")

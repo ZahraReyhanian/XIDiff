@@ -37,8 +37,10 @@ class WrapperDataset(Dataset):
         exp_img, _ = self.base[target_idx]
 
         return {
+            "src_path": self.base.imgs[idx][0],
             "id_img": id_img, #identity image
             "src_label": src_label, #label of identity image
             "target_label": target_label, #target label
-            "exp_img": exp_img #image for target label
+            "exp_img": exp_img, #image for target label
+            "target_path": self.base.imgs[target_idx][0]
         }

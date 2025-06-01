@@ -27,6 +27,10 @@
          "image_size": 112,
          "in_channels": 3,
          "out_channels": 3,
+         "layers_per_block": 2,
+         "block_out_channels": [128, 128, 256, 256, 512, 512],
+         "down_block_types": ["DownBlock2D", "DownBlock2D", "DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"],
+         "up_block_types": ["UpBlock2D", "AttnUpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D"],
          "pretrained_model_path": "pretrained_models/ffhq_10m.pt"}
   },
 
@@ -75,8 +79,9 @@
   "external_mapping" : {
       "version": "v4_dropout",
       "return_spatial": [2],
-      "spatial_dim": 5,
+      "spatial_dim": 3,
       "out_channel": 512,
       "dropout_prob": 0.3
-  }
+  },
+  "perceptual_loss_weight" : [0.01,0.01,0.01,0.01,0.01]
 }

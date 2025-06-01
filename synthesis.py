@@ -24,6 +24,7 @@ def main():
 
     ## config from dcface
     # ckpt = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
+    # print(ckpt['state_dict'])
     # model_hparam = ckpt['hyper_parameters']
     # model_hparam['unet_config']['params']['pretrained_model_path'] = None
     # model_hparam['_target_'] = 'src.trainer.Trainer'
@@ -55,7 +56,7 @@ def main():
     generate_image(pl_module=pl_module,
                    save_root="generated_images",
                    batch_size=bs,
-                   dataloader=datamodule.test_dataloader(),
+                   datamodule=datamodule,
                    device=device)
 
 

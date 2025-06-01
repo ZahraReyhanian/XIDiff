@@ -104,7 +104,7 @@ class Trainer(pl.LightningModule):
 
         self.valid_loss_metric = torchmetrics.MeanMetric()
 
-        self.id_extractor = make_label_mapping(label_mapping, unet_config, root)
+        self.label_mapping = make_label_mapping(label_mapping, unet_config, root)
 
         # self.expression_encoder = create_expression_encoder(device, root=root)
 
@@ -137,8 +137,8 @@ class Trainer(pl.LightningModule):
             params = []
         else:
             params = list(self.model.parameters())
-        if self.id_extractor is not None:
-            params = params + list(self.id_extractor.parameters())
+        if self.label_mapping is not None:
+            params = params + list(self.label_mapping.parameters())
         if self.external_mapping is not None:
             params = params + list(self.external_mapping.parameters())
         return params
@@ -203,12 +203,15 @@ class Trainer(pl.LightningModule):
 
 
             #TODO add extra loss for expression
-            if self.identity_consistency_loss_lambda > 0:
+            if self.identity_consistency_loss_lambda > 0 or \
+                    self.spatial_consistency_loss_lambda > 0:
                 id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
                                                                        noisy_images=noisy_images, batch=batch,
                                                                        pl_module=self)
                 total_loss = total_loss + id_loss * self.identity_consistency_loss_lambda
-
+                if spatial_loss is not None:
+                    total_loss = total_loss + spatial_loss * self.spatial_consistency_loss_lambda
+                    loss_dict[f'{stage}/spatial_loss'] = spatial_loss
                 loss_dict[f'{stage}/id_loss'] = id_loss
 
             loss_dict[f'{stage}/total_loss'] = total_loss
@@ -224,12 +227,13 @@ class Trainer(pl.LightningModule):
     #     self.log_dict(norms)
 
     def get_encoder_hidden_states(self, batch, batch_size=None):
-        batch["id_img"] = batch["id_img"].to(self.trainer_device)
-        batch["src_label"] = batch["src_label"].to(self.trainer_device)
-        batch["exp_img"] = batch["exp_img"].to(self.trainer_device)
-        batch["target_label"] = batch["target_label"].to(self.trainer_device)
+        for key, val in batch.items():
+            if isinstance(val, torch.Tensor):
+                batch[key] = val.to(self.trainer_device)
 
         encoder_hidden_states = make_condition(pl_module=self,
+                                               condition_type=self.unet_config['params']['condition_type'],
+                                               condition_source=self.unet_config['params']['condition_source'],
                                                batch=batch
                                                )
         if batch_size is not None and encoder_hidden_states is not None:
