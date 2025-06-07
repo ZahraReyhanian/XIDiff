@@ -6,7 +6,7 @@ import time
 from typing import Tuple
 import pytorch_lightning as pl
 from pytorch_lightning.strategies.ddp import DDPStrategy
-# from pytorch_lightning.loggers.wandb import WandbLogger
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from Trainer import Trainer as MyModelTrainer
 from utils import os_utils
@@ -36,8 +36,6 @@ def training(cfg, general_cfg):
     # set seed for random number generators in pytorch, numpy and python.random
     pl.seed_everything(cfg["seed"], workers=True)
     path = os.path.join(root, cfg["dataset_path"])
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
 
     datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
@@ -56,8 +54,8 @@ def training(cfg, general_cfg):
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
+                           perceptual_loss_lambda=0,
                            sampler=general_cfg['sampler'],
-                           device=device,
                            root=root)
     model.load_state_dict(modelTrainer_path['state_dict'], strict=True)
 
@@ -67,10 +65,14 @@ def training(cfg, general_cfg):
 
     # print("Instantiating loggers...")
     # logger = WandbLogger(project=cfg["project"], log_model='all', id=cfg["id"], save_dir=cfg["log_dir"], )
+
+    logger = TensorBoardLogger("lightning_logs", name="my_model")
     strategy = DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(accelerator="gpu", callbacks=callbacks,
-                         strategy=strategy, max_epochs=epochs,
-                         # logger=logger
+    trainer = pl.Trainer(accelerator="gpu",
+                         callbacks=callbacks,
+                         strategy=strategy,
+                         max_epochs=epochs,
+                         logger=logger
                          )
 
     object_dict = {
@@ -78,7 +80,7 @@ def training(cfg, general_cfg):
         "datamodule": datamodule,
         "model": model,
         "callbacks": callbacks,
-        # "logger": logger,
+        "logger": logger,
         "trainer": trainer,
     }
 

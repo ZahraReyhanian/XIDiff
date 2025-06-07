@@ -4,7 +4,6 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from torch.nn import functional as F
 
-from expression.expression_encoder import create_expression_encoder
 from models.conditioner import make_condition
 from recognition.external_mapping import make_external_mapping
 from models import model_helper
@@ -17,8 +16,8 @@ from recognition.recognition_helper import disabled_train
 from recognition.label_mapping import make_label_mapping
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from utils.os_utils import get_latest_file
 from functools import partial
+from losses.perceptual_loss import perceptual_loss
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -32,6 +31,7 @@ class Trainer(pl.LightningModule):
                  output_dir=None,
                  lr=0.001,
                  mse_loss_lambda=1,
+                 perceptual_loss_lambda=0.05, #Todo should bet tested
                  identity_consistency_loss_lambda=0.05,
                  identity_consistency_loss_weight_start_bias=0.0,
                  identity_consistency_loss_time_cut=0.0,
@@ -43,7 +43,6 @@ class Trainer(pl.LightningModule):
                  optimizer=torch.optim.AdamW,
                  sampler=None,
                  use_ema=True,
-                 device=None,
                  use_pretrained=False,
                  pretrained_style_path=None,
                  image_size=112,
@@ -58,6 +57,7 @@ class Trainer(pl.LightningModule):
         self.unet_config = unet_config
         self.output_dir = output_dir
         self.mse_loss_lambda = mse_loss_lambda
+        self.perceptual_loss_lambda = perceptual_loss_lambda
         self.identity_consistency_loss_lambda = identity_consistency_loss_lambda
         self.identity_consistency_loss_source = identity_consistency_loss_source
         self.identity_consistency_mix_loss_version = identity_consistency_mix_loss_version
@@ -70,7 +70,6 @@ class Trainer(pl.LightningModule):
         self.sampler = sampler
         self.n_steps = sampler['num_train_timesteps']
         self.use_ema = use_ema
-        self.trainer_device = device
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -175,15 +174,15 @@ class Trainer(pl.LightningModule):
         pass
 
     def shared_step(self, batch, stage='train', optimizer_idx=0, *args, **kwargs):
-        clean_images = batch["id_img"]
+        clean_images = batch["exp_img"]
 
         bsz = clean_images.shape[0]
-        noise = torch.randn(clean_images.shape).to(self.trainer_device)
+        noise = torch.randn(clean_images.shape).to(self.device)
 
         # Sample a random timestep for each image
         timesteps = torch.randint(
             0, self.noise_scheduler.config.num_train_timesteps, (bsz,)
-        ).long().to(self.trainer_device)
+        ).long().to(self.device)
 
         loss_dict = {}
         total_loss = 0.0
@@ -201,8 +200,6 @@ class Trainer(pl.LightningModule):
                 return total_loss, loss_dict
 
 
-
-            #TODO add extra loss for expression
             if self.identity_consistency_loss_lambda > 0 or \
                     self.spatial_consistency_loss_lambda > 0:
                 id_loss, spatial_loss = calc_identity_consistency_loss(eps=noise_pred, timesteps=timesteps,
@@ -213,6 +210,15 @@ class Trainer(pl.LightningModule):
                     total_loss = total_loss + spatial_loss * self.spatial_consistency_loss_lambda
                     loss_dict[f'{stage}/spatial_loss'] = spatial_loss
                 loss_dict[f'{stage}/id_loss'] = id_loss
+
+            if self.perceptual_loss_lambda > 0:
+                perc_loss = perceptual_loss(self.perceptual_loss_weight,
+                                            eps=noise_pred,
+                                            timesteps=timesteps,
+                                            noisy_images=noisy_images,
+                                            pl_module=self,
+                                            target_pixels=batch["exp_img"])
+                total_loss = total_loss + perc_loss*self.perceptual_loss_lambda
 
             loss_dict[f'{stage}/total_loss'] = total_loss
 
@@ -227,9 +233,9 @@ class Trainer(pl.LightningModule):
     #     self.log_dict(norms)
 
     def get_encoder_hidden_states(self, batch, batch_size=None):
-        for key, val in batch.items():
-            if isinstance(val, torch.Tensor):
-                batch[key] = val.to(self.trainer_device)
+        # for key, val in batch.items():
+        #     if isinstance(val, torch.Tensor):
+        #         batch[key] = val.to(self.device)
 
         encoder_hidden_states = make_condition(pl_module=self,
                                                condition_type=self.unet_config['params']['condition_type'],
@@ -248,8 +254,8 @@ class Trainer(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         loss, loss_dict = self.shared_step(batch, stage='train')
-        if self.ema_model.averaged_model.device != self.trainer_device:
-            self.ema_model.averaged_model.to(self.trainer_device)
+        if self.ema_model.averaged_model.device != self.device:
+            self.ema_model.averaged_model.to(self.device)
         self.ema_model.step(self.model)
         self.log("ema_decay", self.ema_model.decay, prog_bar=True, logger=True, on_step=True, on_epoch=False)
         self.log_dict(loss_dict, prog_bar=True)

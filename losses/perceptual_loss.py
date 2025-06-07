@@ -3,6 +3,9 @@ import torchvision
 from torchvision import models
 import numpy as np
 
+from losses.consistency_loss import calculate_x0_from_eps
+
+
 class Vgg19(torch.nn.Module):
     """
     Vgg19 network for perceptual loss. See Sec 3.3.
@@ -51,4 +54,37 @@ class Vgg19(torch.nn.Module):
 def init_perceptual_loss():
     VGG = Vgg19(False).cuda()
     return VGG
+
+
+def perceptual_loss(perceptual_loss_weight, pl_module, eps, noisy_images, timesteps, target_pixels):
+    """
+        This loss function helps us to close the generated image emotion to target image emotion.
+
+        inputs:
+        perceptual_loss_weight: List
+        pl_module: LightningModule
+        eps: noise predicted by unet, Tensor
+        noisy_images: Tensor
+        timesteps: Tensor
+        target_pixels: Tensor
+
+        output:
+        perc_loss: int
+    """
+    vgg19 = init_perceptual_loss()
+    perc_loss = 0
+
+    scheduler = pl_module.noise_scheduler
+    pred_pixels = calculate_x0_from_eps(eps, noisy_images, timesteps, scheduler)
+
+
+    if sum(perceptual_loss_weight) > 0.:
+        x_vgg = vgg19(pred_pixels)
+        y_vgg = vgg19(target_pixels)
+
+        for i, weight in enumerate(perceptual_loss_weight):
+            value = torch.abs(x_vgg[i] - y_vgg[i].detach()).mean()
+            perc_loss += weight * value
+
+    return perc_loss
 
