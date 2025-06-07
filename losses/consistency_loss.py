@@ -86,7 +86,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
     x0_pred_feature = x0_pred_feature / x0_pred_norm
     # center is None
     if recognition_model.center is not None and pl_module.identity_consistency_loss_source == 'center':
-        center = recognition_model.center(batch["src_label"])
+        center = recognition_model.center(batch["target_label"])
         cossim_loss = calc_time_depenent_loss(x0_pred_feature, center,
                                        timesteps=timesteps,
                                        version=pl_module.identity_consistency_loss_version,
@@ -104,7 +104,7 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
 
     elif pl_module.identity_consistency_loss_source == 'mix':
         if pl_module.identity_consistency_loss_center_source == 'center':
-            center = recognition_model.center(batch["src_label"])
+            center = recognition_model.center(batch["target_label"])
             cossim_loss_center = calc_time_depenent_loss(x0_pred_feature, center,
                                                   timesteps=timesteps,
                                                   version=pl_module.identity_consistency_loss_version,

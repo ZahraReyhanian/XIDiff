@@ -144,9 +144,9 @@ if __name__ == "__main__":
         scheduler = checkpoint['scheduler']
 
     # Load dataset
-    dataset_path = os.path.join(root, cfg["dataset_path"])
+    json_path = os.path.join(root, cfg["json_path"])
 
-    datamodule = FaceDataModule(dataset_path=dataset_path,
+    datamodule = FaceDataModule(json_path=json_path,
                                 batch_size=batch_size)
     datamodule.setup()
     train_dataloader = datamodule.train_dataloader()

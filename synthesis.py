@@ -48,9 +48,9 @@ def main():
     # load dataset
     print("loading dataset ........")
 
-    dataset_path = os.path.join(root, cfg["dataset_path"])
+    json_path = os.path.join(root, cfg["json_path"])
     bs = 1
-    datamodule = FaceDataModule(dataset_path=dataset_path, img_size=(image_size, image_size), batch_size=bs)
+    datamodule = FaceDataModule(json_path=json_path, img_size=(image_size, image_size), batch_size=bs)
     datamodule.setup()
 
     generate_image(pl_module=pl_module,

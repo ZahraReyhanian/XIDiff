@@ -35,9 +35,9 @@ def training(cfg, general_cfg):
 
     # set seed for random number generators in pytorch, numpy and python.random
     pl.seed_everything(cfg["seed"], workers=True)
-    path = os.path.join(root, cfg["dataset_path"])
+    json_path = os.path.join(root, cfg["json_path"])
 
-    datamodule = FaceDataModule(dataset_path=path, img_size=(cfg["image_size"], cfg["image_size"]),
+    datamodule = FaceDataModule(json_path=json_path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
     modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
@@ -54,7 +54,7 @@ def training(cfg, general_cfg):
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
-                           perceptual_loss_lambda=0,
+                           perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
                            sampler=general_cfg['sampler'],
                            root=root)
     model.load_state_dict(modelTrainer_path['state_dict'], strict=True)

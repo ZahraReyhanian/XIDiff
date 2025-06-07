@@ -8,7 +8,7 @@ class FaceDataModule(LightningDataModule):
 
     def __init__(
             self,
-            dataset_path,
+            json_path,
             img_size=(48, 48),
             seed=42,
             batch_size=32,
@@ -21,7 +21,7 @@ class FaceDataModule(LightningDataModule):
         self.data_val: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
 
-        self.dataset_path = dataset_path
+        self.json_path = json_path
         self.img_size = img_size
         self.seed = seed
         self.batch_size = batch_size
@@ -35,21 +35,23 @@ class FaceDataModule(LightningDataModule):
 
     @property
     def num_classes(self):
-        return len(self.data_train.class_names)
+        return len(self.data_train.all_labels)
 
     def setup(self, stage: Optional[str] = None):
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-
-
-            # load dataset
-            train_base = datasets.ImageFolder(f'{self.dataset_path}train', transform=self.transform)
-            val_base = datasets.ImageFolder(f'{self.dataset_path}valid', transform=self.transform)
-            test_base = datasets.ImageFolder(f'{self.dataset_path}test', transform=self.transform)
-
-            self.data_train = WrapperDataset(train_base)
-            self.data_val = WrapperDataset(val_base)
-            self.data_test = WrapperDataset(test_base)
+            self.data_train = WrapperDataset(
+                json_path=f"{self.json_path}/train.json",
+                transform=self.transform
+            )
+            self.data_val = WrapperDataset(
+                json_path=f"{self.json_path}/val.json",
+                transform=self.transform
+            )
+            self.data_test = WrapperDataset(
+                json_path=f"{self.json_path}/test.json",
+                transform=self.transform
+            )
 
     def train_dataloader(self):
         return DataLoader(
