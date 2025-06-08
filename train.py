@@ -14,9 +14,9 @@ from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
 from utils.os_utils import get_latest_file
 
-epochs = 30
+epochs = 10
 use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
-continue_training = False # Training of Trainer
+continue_training = True # Training of Trainer
 
 
 def training(cfg, general_cfg):
