@@ -3,6 +3,10 @@ import json
 
 def collect_pairs_from_split(split_dir):
     all_pairs = []
+    if 'train' in split_dir:
+        num_neutral_imgs = 2
+    else:
+        num_neutral_imgs = 10
 
     for person in os.listdir(split_dir):
         person_path = os.path.join(split_dir, person)
@@ -31,22 +35,23 @@ def collect_pairs_from_split(split_dir):
                 if f.endswith('.jpg')
             ]
 
-            for n_img in neutral_imgs:
+            for n_img in neutral_imgs[:num_neutral_imgs]:
                 for e_img in emotion_imgs:
                     all_pairs.append([n_img, e_img, emotion])
 
     return all_pairs
 
 
-with open('config/config.json') as f:
+with open('../config/config.json') as f:
     cfg = json.load(f)
 
-root = cfg['root']
+root = str(cfg["root"])
 dataset_root = os.path.join(root, cfg["dataset_path"])
 
 # collect and save
 splits = ['train', 'valid', 'test']
-json_path = cfg['json_path']
+json_path = os.path.join(root, cfg['json_path'])
+print('saved path: ', json_path)
 os.makedirs(json_path, exist_ok=True)
 
 for split in splits:

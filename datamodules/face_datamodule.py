@@ -45,7 +45,7 @@ class FaceDataModule(LightningDataModule):
                 transform=self.transform
             )
             self.data_val = WrapperDataset(
-                json_path=f"{self.json_path}/val.json",
+                json_path=f"{self.json_path}/valid.json",
                 transform=self.transform
             )
             self.data_test = WrapperDataset(

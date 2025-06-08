@@ -45,6 +45,7 @@ class Trainer(pl.LightningModule):
                  use_ema=True,
                  use_pretrained=False,
                  pretrained_style_path=None,
+                 perceptual_loss_weight=[],
                  image_size=112,
                  root='',
                  *args, **kwargs
@@ -70,6 +71,7 @@ class Trainer(pl.LightningModule):
         self.sampler = sampler
         self.n_steps = sampler['num_train_timesteps']
         self.use_ema = use_ema
+        self.perceptual_loss_weight = perceptual_loss_weight
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -233,9 +235,9 @@ class Trainer(pl.LightningModule):
     #     self.log_dict(norms)
 
     def get_encoder_hidden_states(self, batch, batch_size=None):
-        # for key, val in batch.items():
-        #     if isinstance(val, torch.Tensor):
-        #         batch[key] = val.to(self.device)
+        for key, val in batch.items():
+            if isinstance(val, torch.Tensor):
+                batch[key] = val.to(self.device)
 
         encoder_hidden_states = make_condition(pl_module=self,
                                                condition_type=self.unet_config['params']['condition_type'],

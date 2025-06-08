@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 import json
 from PIL import Image
+import torch
 
 class WrapperDataset(Dataset):
     """
@@ -27,6 +28,7 @@ class WrapperDataset(Dataset):
 
     def __getitem__(self, idx):
         neutral_path, emotion_path, emotion_label = self.data[idx]
+        label_idx = self.label_to_idx[emotion_label]
 
         neutral_img = Image.open(neutral_path).convert('RGB')
         emotion_img = Image.open(emotion_path).convert('RGB')
@@ -38,7 +40,7 @@ class WrapperDataset(Dataset):
         return {
             "src_path": neutral_path,
             "id_img": neutral_img, #identity image
-            "target_label": emotion_label, #target label
+            "target_label": label_idx, #target label
             "exp_img": emotion_img, #image for target label
             "target_path": emotion_path
         }

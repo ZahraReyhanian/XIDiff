@@ -10,15 +10,15 @@ def make_condition(pl_module, condition_type, condition_source, batch):
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
 
     if condition_type == 'cross_attn' and condition_source == 'label_center':
-        assert 'src_label' in batch
-        class_label = batch['src_label'].to(pl_module.device)
+        assert 'target_label' in batch
+        class_label = batch['target_label']
         center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
         label_emb = pl_module.label_mapping(center_emb)
         result['cross_attn'] = label_emb
 
     elif condition_type == 'cross_attn' and condition_source == 'spatial_and_label_center':
-        assert 'src_label' in batch
-        class_label = batch['src_label'].to(pl_module.device)
+        assert 'target_label' in batch
+        class_label = batch['target_label']
         center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
         _, spatial = pl_module.recognition_model(batch['exp_img'].to(pl_module.device))
         label_emb = pl_module.label_mapping(center_emb)
@@ -26,8 +26,8 @@ def make_condition(pl_module, condition_type, condition_source, batch):
         result['cross_attn'] = torch.cat([label_emb, ext_mapping], dim=2)
 
     elif condition_type == 'add_and_cat' and condition_source == 'spatial_and_label_center':
-        assert 'src_label' in batch
-        class_label = batch['src_label'].to(pl_module.device)
+        assert 'target_label' in batch
+        class_label = batch['target_label']
         center_emb = pl_module.recognition_model.center(class_label)
         _, spatial = pl_module.recognition_model(batch['exp_img'].to(pl_module.device))
         label_emb = pl_module.label_mapping(center_emb)
@@ -36,8 +36,8 @@ def make_condition(pl_module, condition_type, condition_source, batch):
         result['concat'] = ext_mapping
 
     elif condition_type == 'cross_attn' and condition_source == 'patchstat_spatial_and_linear_label_center':
-        assert 'src_label' in batch
-        class_label = batch['src_label'].to(pl_module.device)
+        assert 'target_label' in batch
+        class_label = batch['target_label']
         center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
         _, spatial = pl_module.recognition_model(batch['exp_img'].to(pl_module.device))
         label_emb = pl_module.label_mapping(center_emb)
@@ -57,7 +57,7 @@ def make_condition(pl_module, condition_type, condition_source, batch):
         result['cross_attn'] = pl_module.external_mapping.cross_attn_adapter(cross_attn)
         result['stylemod'] = id_feat
 
-        class_label = batch['src_label'].to(pl_module.device)
+        class_label = batch['target_label']
         center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
     elif condition_type == 'crossatt_and_stylemod' and condition_source == 'image_and_patchstat_spatial':
         assert 'id_img' in batch
@@ -69,7 +69,7 @@ def make_condition(pl_module, condition_type, condition_source, batch):
         result['cross_attn'] = pl_module.label_mapping.cross_attn_adapter(cross_attn)
         result['stylemod'] = ext_mapping
 
-        class_label = batch['src_label'].to(pl_module.device)
+        class_label = batch['target_label']
         center_emb = pl_module.recognition_model.center(class_label).unsqueeze(1)
     else:
         raise ValueError('make Condition')

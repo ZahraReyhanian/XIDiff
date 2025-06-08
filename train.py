@@ -41,7 +41,6 @@ def training(cfg, general_cfg):
                                 batch_size=cfg["batch_size"])
 
     modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
-    print(modelTrainer_path['hyper_parameters'])
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -55,6 +54,7 @@ def training(cfg, general_cfg):
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
                            perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
+                           perceptual_loss_weight=cfg['perceptual_loss_weight'],
                            sampler=general_cfg['sampler'],
                            root=root)
     model.load_state_dict(modelTrainer_path['state_dict'], strict=True)
