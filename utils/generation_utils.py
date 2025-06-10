@@ -18,8 +18,8 @@ def generate_image(pl_module, datamodule, device, batch_size=1, num_workers=0, s
 
     it = 0
     dataloader = datamodule.test_dataloader()
+    print(datamodule.data_test.idx_to_label)
     for batch in tqdm(dataloader, total=len(dataloader), desc='Generating Images: '):
-        print('source_label:', batch['src_label'])
         print('target_label:', batch['target_label'])
 
         original_image = Image.open(batch['src_path'][0]).convert("RGB")
@@ -34,7 +34,7 @@ def generate_image(pl_module, datamodule, device, batch_size=1, num_workers=0, s
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             cv2.imwrite(save_path, image)
 
-            save_path = os.path.join(save_root, f"img_{i}_{it}-exp.jpg")
+            save_path = os.path.join(save_root, f"img_{i}_{it}_{batch['target_label'].item()}-exp.jpg")
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             target_image.save(save_path)
 

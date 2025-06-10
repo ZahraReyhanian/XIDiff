@@ -148,7 +148,8 @@ def calc_identity_consistency_loss(eps, timesteps, noisy_images, batch, pl_modul
         weights_tensor = torch.tensor(weights, dtype=cossim_loss_center.dtype, device=cossim_loss_center.device)
         mix_weights = weights_tensor[timesteps]
 
-        cossim_loss = cossim_loss_center * mix_weights + cossim_loss_image * (1-mix_weights)
+        cossim_loss = cossim_loss_center * mix_weights
+                       # + cossim_loss_image * (1-mix_weights))
 
         if pl_module.identity_consistency_loss_time_cut > 0:
             time_cut_ratio = pl_module.identity_consistency_loss_time_cut

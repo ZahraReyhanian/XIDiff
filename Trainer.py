@@ -46,6 +46,7 @@ class Trainer(pl.LightningModule):
                  use_pretrained=False,
                  pretrained_style_path=None,
                  perceptual_loss_weight=[],
+                 freeze_label_mapping=True,
                  image_size=112,
                  root='',
                  *args, **kwargs
@@ -72,6 +73,7 @@ class Trainer(pl.LightningModule):
         self.n_steps = sampler['num_train_timesteps']
         self.use_ema = use_ema
         self.perceptual_loss_weight = perceptual_loss_weight
+        self.freeze_label_mapping = freeze_label_mapping
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -130,6 +132,10 @@ class Trainer(pl.LightningModule):
             for param in self.model.parameters():
                 param.requires_grad = False
 
+        if freeze_label_mapping:
+            for param in self.label_mapping.parameters():
+                param.requires_grad = False
+
         self.save_hyperparameters()
 
     def get_parameters(self):
@@ -138,7 +144,7 @@ class Trainer(pl.LightningModule):
             params = []
         else:
             params = list(self.model.parameters())
-        if self.label_mapping is not None:
+        if self.label_mapping is not None and not self.freeze_label_mapping:
             params = params + list(self.label_mapping.parameters())
         if self.external_mapping is not None:
             params = params + list(self.external_mapping.parameters())
@@ -221,6 +227,7 @@ class Trainer(pl.LightningModule):
                                             pl_module=self,
                                             target_pixels=batch["exp_img"])
                 total_loss = total_loss + perc_loss*self.perceptual_loss_lambda
+                loss_dict[f'{stage}/perc_loss'] = perc_loss
 
             loss_dict[f'{stage}/total_loss'] = total_loss
 

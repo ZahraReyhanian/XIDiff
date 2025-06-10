@@ -5,12 +5,12 @@ def create_list_of_callbacks(path):
     lr_monitor = LearningRateMonitor(logging_interval='step')
     model_checkpoint = ModelCheckpoint(
         dirpath=path,
-        filename= "epoch{epoch}-step_{step:5d}",
-        monitor= "val/mse_loss",
-        save_last= True,
-        every_n_train_steps=500,
-        save_top_k=1,
+        filename= "{epoch}-{step}",
+        monitor= "train/total_loss",
+        every_n_train_steps=1000,
+        save_top_k=-1,
         mode='min',
+        save_last=True,
         save_weights_only= False,)
 
     callbacks = [lr_monitor, model_checkpoint]

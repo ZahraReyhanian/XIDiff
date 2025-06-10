@@ -8,7 +8,7 @@ import json
 
 from utils.os_utils import get_latest_file
 
-image_size = 256
+image_size = 112
 
 def natural_sort(l):
     convert = lambda text: int(text) if text.isdigit() else text.lower()

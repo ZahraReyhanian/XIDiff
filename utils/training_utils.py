@@ -191,35 +191,3 @@ class EMAModel(nn.Module):
 
         self.averaged_model.load_state_dict(ema_state_dict, strict=False)
         self.optimization_step += 1
-
-# def generate_image(model, fake_image_path, im_size, dataloader, batch_size, n_steps, device, generator: Optional[torch.Generator] = None,):
-#
-#     with torch.no_grad():
-#         it = 0
-#         for batch in dataloader:
-#             print("image: ", it)
-#             noise = torch.randn(batch[0].shape).to(device)
-#             timesteps = torch.randint(
-#                 0, n_steps, (batch_size,), device=device
-#             ).long().to(device)
-#             clean_image = batch[0].to(device)
-#             image = model.noise_scheduler.add_noise(clean_image, noise, timesteps)
-#             image = image.to(device)
-#
-#             # set step values
-#             model.noise_scheduler.set_timesteps(n_steps)
-#
-#             for t in tqdm(model.noise_scheduler.timesteps):
-#                 # 1. predict noise model_output
-#                 t = t.to(device)
-#                 encoder_hidden_states = model.get_encoder_hidden_states(batch, batch_size=None)
-#                 model_output = model.model(image, t, encoder_hidden_states=encoder_hidden_states).sample
-#
-#                 # 2. compute previous image: x_t -> x_t-1
-#                 image = model.noise_scheduler.step(model_output, t, image, generator=generator).prev_sample
-#
-#             image = (image / 2 + 0.5).clamp(0, 1)
-#             image = image.cpu()
-#             save_image(tensor=image, fp=f'{fake_image_path}/img_{it}.png')
-#             it+=1
-#

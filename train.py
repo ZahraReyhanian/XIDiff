@@ -16,7 +16,7 @@ from utils.os_utils import get_latest_file
 
 epochs = 10
 use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
-continue_training = True # Training of Trainer
+continue_training = False # Training of Trainer
 
 
 def training(cfg, general_cfg):
