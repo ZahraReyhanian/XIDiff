@@ -63,9 +63,6 @@ def training(cfg, general_cfg):
     model_ckpt_path = root + cfg["ckpt_path"]
     callbacks = create_list_of_callbacks(model_ckpt_path)
 
-    # print("Instantiating loggers...")
-    # logger = WandbLogger(project=cfg["project"], log_model='all', id=cfg["id"], save_dir=cfg["log_dir"], )
-
     logger = TensorBoardLogger("lightning_logs", name="my_model")
     strategy = DDPStrategy(find_unused_parameters=False)
     trainer = pl.Trainer(accelerator="gpu",

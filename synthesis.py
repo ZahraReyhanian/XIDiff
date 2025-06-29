@@ -56,8 +56,7 @@ def main():
     generate_image(pl_module=pl_module,
                    save_root="generated_images",
                    batch_size=bs,
-                   datamodule=datamodule,
-                   device=device)
+                   datamodule=datamodule)
 
 
 if __name__ == "__main__":

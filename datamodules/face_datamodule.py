@@ -75,6 +75,6 @@ class FaceDataModule(LightningDataModule):
         return DataLoader(
             dataset=self.data_test,
             batch_size=self.batch_size,
-            shuffle=False,
+            shuffle=True,
             drop_last=True
         )

@@ -11,8 +11,7 @@ import numpy as np
 from PIL import Image
 
 
-def generate_image(pl_module, datamodule, device, batch_size=1, num_workers=0, save_root='./',
-                   num_partition=1, partition_idx=0, seed=42):
+def generate_image(pl_module, datamodule, batch_size=1, save_root='./', seed=42):
     os.makedirs(save_root, exist_ok=True)
     print(save_root)
 
@@ -44,14 +43,11 @@ def generate_image(pl_module, datamodule, device, batch_size=1, num_workers=0, s
 
             it += 1
 
-        if it > 15:
+        if it > 50:
             break
 
 
 def sample_batch(batch, pl_module, seed=None):
-    # batch = {'style_image': style_images,
-    #          'class_label': torch.arange(len(style_images)),
-    #          'id_image': id_images}
 
     if seed is not None:
         generator = torch.manual_seed(seed)

@@ -18,6 +18,7 @@ from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from functools import partial
 from losses.perceptual_loss import perceptual_loss
+from models.unet import AttentionBlock
 
 class Trainer(pl.LightningModule):
     """main class"""
@@ -31,7 +32,7 @@ class Trainer(pl.LightningModule):
                  output_dir=None,
                  lr=0.001,
                  mse_loss_lambda=1,
-                 perceptual_loss_lambda=0.05, #Todo should bet tested
+                 perceptual_loss_lambda=0.05, #Todo should be tested
                  identity_consistency_loss_lambda=0.05,
                  identity_consistency_loss_weight_start_bias=0.0,
                  identity_consistency_loss_time_cut=0.0,
@@ -47,6 +48,7 @@ class Trainer(pl.LightningModule):
                  pretrained_style_path=None,
                  perceptual_loss_weight=[],
                  freeze_label_mapping=True,
+                 only_attention_finetuning=True,
                  image_size=112,
                  root='',
                  *args, **kwargs
@@ -74,6 +76,7 @@ class Trainer(pl.LightningModule):
         self.use_ema = use_ema
         self.perceptual_loss_weight = perceptual_loss_weight
         self.freeze_label_mapping = freeze_label_mapping
+        self.only_attention_finetuning = only_attention_finetuning
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -132,9 +135,17 @@ class Trainer(pl.LightningModule):
             for param in self.model.parameters():
                 param.requires_grad = False
 
+        # freeze identity encoder
         if freeze_label_mapping:
             for param in self.label_mapping.parameters():
                 param.requires_grad = False
+
+        # Just fine-tune AttentionBlock and others should be freez
+        if only_attention_finetuning:
+            for module_name, module in self.model.named_modules():
+                if not isinstance(module, AttentionBlock):
+                    for param in module.parameters():
+                        param.requires_grad = False
 
         self.save_hyperparameters()
 
@@ -142,6 +153,11 @@ class Trainer(pl.LightningModule):
         if self.unet_config['freeze_unet']:
             print('freeze unet skip optim params')
             params = []
+        elif self.only_attention_finetuning:
+            params = []
+            for param in self.model.parameters():
+                if param.requires_grad:
+                    params.append(param)
         else:
             params = list(self.model.parameters())
         if self.label_mapping is not None and not self.freeze_label_mapping:
@@ -203,7 +219,7 @@ class Trainer(pl.LightningModule):
 
             total_loss = total_loss + mse_loss * self.mse_loss_lambda
             loss_dict[f'{stage}/mse_loss'] = mse_loss
-            if stage != 'train':
+            if stage == 'test':
                 loss_dict[f'{stage}/total_loss'] = total_loss
                 return total_loss, loss_dict
 
