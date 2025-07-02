@@ -40,7 +40,7 @@ def training(cfg, general_cfg):
     datamodule = FaceDataModule(json_path=json_path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
-    modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
+    modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_5x5.ckpt'), weights_only=False)
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -56,6 +56,7 @@ def training(cfg, general_cfg):
                            perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
                            perceptual_loss_weight=cfg['perceptual_loss_weight'],
                            sampler=general_cfg['sampler'],
+                           freeze_label_mapping=False,
                            root=root)
     model.load_state_dict(modelTrainer_path['state_dict'], strict=True)
 
@@ -64,10 +65,10 @@ def training(cfg, general_cfg):
     callbacks = create_list_of_callbacks(model_ckpt_path)
 
     logger = TensorBoardLogger("lightning_logs", name="my_model")
-    strategy = DDPStrategy(find_unused_parameters=False)
+    # strategy = DDPStrategy(find_unused_parameters=False)
     trainer = pl.Trainer(accelerator="gpu",
                          callbacks=callbacks,
-                         strategy=strategy,
+                         strategy="auto" ,
                          max_epochs=epochs,
                          logger=logger
                          )

@@ -42,20 +42,22 @@ def main():
     print("loading from: ", checkpoint_path)
 
     pl_module = MyModelTrainer.load_from_checkpoint(checkpoint_path=checkpoint_path)
-    pl_module.to('cuda')
+    pl_module.to(device)
     pl_module.eval()
 
     # load dataset
     print("loading dataset ........")
 
     json_path = os.path.join(root, cfg["json_path"])
-    bs = 1
-    datamodule = FaceDataModule(json_path=json_path, img_size=(image_size, image_size), batch_size=bs)
+    batch_size = 1
+    datamodule = FaceDataModule(json_path=json_path,
+                                img_size=(image_size, image_size),
+                                batch_size=batch_size)
     datamodule.setup()
 
     generate_image(pl_module=pl_module,
                    save_root="generated_images",
-                   batch_size=bs,
+                   batch_size=batch_size,
                    datamodule=datamodule)
 
 

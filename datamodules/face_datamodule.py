@@ -13,7 +13,8 @@ class FaceDataModule(LightningDataModule):
             seed=42,
             batch_size=32,
             num_workers=8,
-            transforms_setting=None
+            transforms_setting=None,
+            shuffle=True
     ):
         super().__init__()
 
@@ -24,6 +25,7 @@ class FaceDataModule(LightningDataModule):
         self.json_path = json_path
         self.img_size = img_size
         self.seed = seed
+        self.shuffle = shuffle
         self.batch_size = batch_size
         self.num_workers = num_workers
         if transforms_setting is None:
@@ -50,7 +52,9 @@ class FaceDataModule(LightningDataModule):
             )
             self.data_test = WrapperDataset(
                 json_path=f"{self.json_path}/test.json",
-                transform=self.transform
+                transform=self.transform,
+                shuffle=self.shuffle,
+                seed=self.seed
             )
 
     def train_dataloader(self):
@@ -75,6 +79,6 @@ class FaceDataModule(LightningDataModule):
         return DataLoader(
             dataset=self.data_test,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             drop_last=True
         )

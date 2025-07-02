@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import json
 from PIL import Image
 import torch
+import random
 
 class WrapperDataset(Dataset):
     """
@@ -13,11 +14,15 @@ class WrapperDataset(Dataset):
         "src_path"
     }
     """
-    def __init__(self, json_path, transform=None):
+    def __init__(self, json_path, transform=None, shuffle=False, seed=42):
         self.transform = transform
 
         with open(json_path, 'r') as f:
             self.data = json.load(f)
+
+        if shuffle:
+            random.seed(seed)
+            random.shuffle(self.data)
 
         all_labels = sorted(set([d[2] for d in self.data]))
         self.label_to_idx = {label: idx for idx, label in enumerate(all_labels)}

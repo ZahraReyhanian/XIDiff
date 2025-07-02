@@ -47,7 +47,7 @@ class Trainer(pl.LightningModule):
                  use_pretrained=False,
                  pretrained_style_path=None,
                  perceptual_loss_weight=[],
-                 freeze_label_mapping=True,
+                 freeze_label_mapping=False,
                  only_attention_finetuning=True,
                  image_size=112,
                  root='',
@@ -291,7 +291,7 @@ class Trainer(pl.LightningModule):
     def validation_step(self, batch, batch_idx, stage='val'):
         loss, loss_dict = self.shared_step(batch, stage=stage)
         self.valid_loss_metric.update(loss_dict[f'{stage}/mse_loss'])
-        self.log('val_loss', loss, prog_bar=True, sync_dist=True)
+        self.log_dict(loss_dict, prog_bar=True)
         return loss
 
     def on_validation_epoch_end(self, stage = 'val', *args, **kwargs):
