@@ -40,7 +40,7 @@ def training(cfg, general_cfg):
     datamodule = FaceDataModule(json_path=json_path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
-    modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_5x5.ckpt'), weights_only=False)
+    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v3.ckpt'), weights_only=False)
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -49,14 +49,15 @@ def training(cfg, general_cfg):
                            recognition_eval=general_cfg['recognition_eval'],
                            label_mapping=general_cfg['label_mapping'],
                            external_mapping=general_cfg['external_mapping'],
-                           # pretrained_style_path=cfg['style_ckpt_path']+"/"+cfg['name_style_ckpt'],
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
                            perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
                            perceptual_loss_weight=cfg['perceptual_loss_weight'],
                            sampler=general_cfg['sampler'],
-                           freeze_label_mapping=False,
+                           freeze_label_mapping=True,
+                           only_attention_finetuning=True,
+                           attention_on_style=False,
                            root=root)
     model.load_state_dict(modelTrainer_path['state_dict'], strict=True)
 

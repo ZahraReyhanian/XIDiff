@@ -43,11 +43,11 @@ def main():
                                 shuffle=False)
     datamodule.setup()
 
-    for batch in datamodule.test_dataloader():
+    for it, batch in enumerate(datamodule.test_dataloader()):
         generate_interpolation(batch, pl_module, num_img_per_subject=4, num_subjects=4,
                                mixing_method='spatial_interpolate',
-                               save_root='interpolation')
-        break
+                               save_root='interpolation', it=it)
+        print(it)
 
 if __name__ == "__main__":
     main()

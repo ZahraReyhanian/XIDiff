@@ -53,6 +53,10 @@ def make_condition(pl_module, condition_type, condition_source, batch):
         id_feat, id_cross_att = pl_module.label_mapping(batch['id_img'])
         _, spatial = pl_module.recognition_model(batch['exp_img'].to(pl_module.device))
         ext_mapping = pl_module.external_mapping(spatial)
+
+        if pl_module.attention_on_style:
+            ext_mapping = pl_module.attn(ext_mapping)
+
         cross_attn = torch.cat([id_cross_att, ext_mapping], dim=1).transpose(1,2)
         result['cross_attn'] = pl_module.external_mapping.cross_attn_adapter(cross_attn)
         result['stylemod'] = id_feat

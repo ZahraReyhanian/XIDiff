@@ -39,7 +39,7 @@ def generate_image(pl_module, datamodule, batch_size=1, save_root='./', seed=42)
 
             it += 1
 
-        if it > 200:
+        if it > 500:
             break
 
 

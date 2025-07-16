@@ -5,6 +5,7 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from functools import partial
 from pytorch_lightning.utilities import rank_zero_only
 from torchvision.utils import save_image
@@ -103,6 +104,22 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
     # ^^ safe to call this function even if cuda is not available
 
+
+class FeatureAttention(nn.Module):
+    def __init__(self, embed_dim):
+        super().__init__()
+        self.attn = nn.Sequential(
+            nn.Linear(embed_dim, 1),
+        )
+
+    def forward(self, x):
+        # x: (batch_size, 10, 512)
+        attn_scores = self.attn(x).squeeze(-1)  # (batch_size, 10)
+        attn_weights = F.softmax(attn_scores, dim=1)
+        attn_weights = attn_weights.unsqueeze(-1)  # (batch_size, 10, 1)
+
+        x_weighted = x * attn_weights  # (batch_size, 10, 512)
+        return x_weighted
 
 class EMAModel(nn.Module):
     """

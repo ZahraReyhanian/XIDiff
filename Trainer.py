@@ -8,9 +8,10 @@ from models.conditioner import make_condition
 from recognition.external_mapping import make_external_mapping
 from models import model_helper
 import torchmetrics
-from utils.training_utils import EMAModel
+from utils.training_utils import EMAModel, FeatureAttention
 from losses.consistency_loss import calc_identity_consistency_loss
 import torch
+import torch.nn as nn
 from recognition.recognition_helper import RecognitionModel, make_recognition_model, same_config
 from recognition.recognition_helper import disabled_train
 from recognition.label_mapping import make_label_mapping
@@ -49,6 +50,7 @@ class Trainer(pl.LightningModule):
                  perceptual_loss_weight=[],
                  freeze_label_mapping=False,
                  only_attention_finetuning=True,
+                 attention_on_style=True,
                  image_size=112,
                  root='',
                  *args, **kwargs
@@ -77,6 +79,7 @@ class Trainer(pl.LightningModule):
         self.perceptual_loss_weight = perceptual_loss_weight
         self.freeze_label_mapping = freeze_label_mapping
         self.only_attention_finetuning = only_attention_finetuning
+        self.attention_on_style = attention_on_style
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -110,11 +113,13 @@ class Trainer(pl.LightningModule):
 
         self.valid_loss_metric = torchmetrics.MeanMetric()
 
-        self.label_mapping = make_label_mapping(label_mapping, unet_config, root)
+        self.label_mapping = make_label_mapping(label_mapping, unet_config, root) #id_encoder
 
         # self.expression_encoder = create_expression_encoder(device, root=root)
 
-        self.external_mapping = make_external_mapping(external_mapping, unet_config)
+        self.external_mapping = make_external_mapping(external_mapping, unet_config) #style_encoder
+
+        self.attn = FeatureAttention(external_mapping["out_channel"])
 
         if pretrained_style_path:
             pretrained_style_path = os.path.join(root, pretrained_style_path)
@@ -164,6 +169,8 @@ class Trainer(pl.LightningModule):
             params = params + list(self.label_mapping.parameters())
         if self.external_mapping is not None:
             params = params + list(self.external_mapping.parameters())
+        if self.attn is not None and self.attention_on_style:
+            params = params + list(self.attn.parameters())
         return params
 
     def configure_optimizers(self):

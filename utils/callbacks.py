@@ -7,7 +7,7 @@ def create_list_of_callbacks(path):
         dirpath=path,
         filename= "{epoch}-{step}",
         monitor= "train/total_loss",
-        every_n_train_steps=1000,
+        every_n_train_steps=10000,
         save_top_k=-1,
         mode='min',
         save_last=True,

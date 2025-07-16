@@ -40,7 +40,7 @@ def prepare_text_img(text, height=300, width=30, fontsize=16, textcolor='C1', fo
 
 def generate_interpolation(batch, pl_module, num_img_per_subject, num_subjects, mixing_method,
                            save_root='interpolation',
-                           return_x0_intermediates=False):
+                           return_x0_intermediates=False, it=0):
 
     label_batch, extra_batch = divide_batch(batch, half=num_img_per_subject*num_subjects)
 
@@ -96,7 +96,7 @@ def generate_interpolation(batch, pl_module, num_img_per_subject, num_subjects, 
             vis.append(grid_uint8)
 
         vis = np.concatenate(vis, axis=0)
-        sample_visual.save_uint8(vis, path='{}/{}.jpg'.format(save_root, i))
+        sample_visual.save_uint8(vis, path='{}/{}-{}.jpg'.format(save_root, i, it))
 
 
 def divide_batch(batch, half=4):
