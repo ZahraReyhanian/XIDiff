@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from torch.nn import functional as F
 
+# from losses.arcface_loss import ArcFace
 from models.conditioner import make_condition
 from recognition.external_mapping import make_external_mapping
 from models import model_helper
@@ -33,6 +34,7 @@ class Trainer(pl.LightningModule):
                  output_dir=None,
                  lr=0.001,
                  mse_loss_lambda=1,
+                 arcface_loss_lambda=0.05,
                  perceptual_loss_lambda=0.05, #Todo should be tested
                  identity_consistency_loss_lambda=0.05,
                  identity_consistency_loss_weight_start_bias=0.0,
@@ -51,7 +53,8 @@ class Trainer(pl.LightningModule):
                  freeze_label_mapping=False,
                  only_attention_finetuning=True,
                  attention_on_style=True,
-                 image_size=112,
+                 num_classes=6,
+                 batch_size=16,
                  root='',
                  *args, **kwargs
                  ):
@@ -62,7 +65,9 @@ class Trainer(pl.LightningModule):
         self.lr = lr
         self.unet_config = unet_config
         self.output_dir = output_dir
+        self.num_classes = num_classes
         self.mse_loss_lambda = mse_loss_lambda
+        self.arcface_loss_lambda = arcface_loss_lambda
         self.perceptual_loss_lambda = perceptual_loss_lambda
         self.identity_consistency_loss_lambda = identity_consistency_loss_lambda
         self.identity_consistency_loss_source = identity_consistency_loss_source
@@ -80,6 +85,7 @@ class Trainer(pl.LightningModule):
         self.freeze_label_mapping = freeze_label_mapping
         self.only_attention_finetuning = only_attention_finetuning
         self.attention_on_style = attention_on_style
+        self.batch_size = batch_size
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -112,6 +118,10 @@ class Trainer(pl.LightningModule):
             self.recognition_model_eval: RecognitionModel = make_recognition_model(recognition_eval, root)
 
         self.valid_loss_metric = torchmetrics.MeanMetric()
+        channels = external_mapping["out_channel"]
+        dim = external_mapping["spatial_dim"]
+        features = dim * dim + 1
+        self.embed_size = features*channels
 
         self.label_mapping = make_label_mapping(label_mapping, unet_config, root) #id_encoder
 
@@ -217,7 +227,7 @@ class Trainer(pl.LightningModule):
 
         loss_dict = {}
         total_loss = 0.0
-
+        # arcface_loss = ArcFace(embed_size=self.embed_size, num_classes=self.num_classes).to(self.device)
         if optimizer_idx == 0:
             noisy_images = self.noise_scheduler.add_noise(clean_images, noise, timesteps)
             encoder_hidden_states = self.get_encoder_hidden_states(batch, batch_size=None)
@@ -251,6 +261,12 @@ class Trainer(pl.LightningModule):
                                             target_pixels=batch["exp_img"])
                 total_loss = total_loss + perc_loss*self.perceptual_loss_lambda
                 loss_dict[f'{stage}/perc_loss'] = perc_loss
+
+            # if self.arcface_loss_lambda > 0:
+            #     embed = encoder_hidden_states['style'].reshape(-1, self.embed_size)
+            #     arc_loss = arcface_loss(embed, batch["target_label"])
+            #     total_loss = total_loss + arc_loss * self.arcface_loss_lambda
+            #     loss_dict[f'{stage}/arcface_loss'] = arc_loss
 
             loss_dict[f'{stage}/total_loss'] = total_loss
 
@@ -290,7 +306,7 @@ class Trainer(pl.LightningModule):
             self.ema_model.averaged_model.to(self.device)
         self.ema_model.step(self.model)
         self.log("ema_decay", self.ema_model.decay, prog_bar=True, logger=True, on_step=True, on_epoch=False)
-        self.log_dict(loss_dict, prog_bar=True)
+        self.log_dict(loss_dict, prog_bar=True, batch_size=self.batch_size)
 
         return loss
 

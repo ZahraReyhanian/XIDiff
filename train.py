@@ -14,7 +14,7 @@ from utils.callbacks import create_list_of_callbacks
 from datamodules.face_datamodule import FaceDataModule
 from utils.os_utils import get_latest_file
 
-epochs = 10
+epochs = 5
 use_pretrained = True  # True: Finetune unet from main dcface, False: Train from 0 unet
 continue_training = False # Training of Trainer
 
@@ -40,7 +40,7 @@ def training(cfg, general_cfg):
     datamodule = FaceDataModule(json_path=json_path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
-    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v3.ckpt'), weights_only=False)
+    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last.ckpt'), weights_only=False)
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -50,14 +50,17 @@ def training(cfg, general_cfg):
                            label_mapping=general_cfg['label_mapping'],
                            external_mapping=general_cfg['external_mapping'],
                            output_dir=cfg["output_dir"],
-                           mse_loss_lambda=cfg["mse_loss_lambda"],
-                           identity_consistency_loss_lambda=cfg["identity_consistency_loss_lambda"],
+                           mse_loss_lambda=0, #cfg["mse_loss_lambda"],
+                           identity_consistency_loss_lambda=0, #cfg["identity_consistency_loss_lambda"],
+                           arcface_loss_lambda=0, #cfg['arcface_loss_lambda'],
                            perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
                            perceptual_loss_weight=cfg['perceptual_loss_weight'],
                            sampler=general_cfg['sampler'],
                            freeze_label_mapping=True,
                            only_attention_finetuning=True,
                            attention_on_style=False,
+                           num_classes=cfg['num_classes'],
+                           batch_size=cfg["batch_size"],
                            root=root)
     model.load_state_dict(modelTrainer_path['state_dict'], strict=True)
 
@@ -65,7 +68,7 @@ def training(cfg, general_cfg):
     model_ckpt_path = root + cfg["ckpt_path"]
     callbacks = create_list_of_callbacks(model_ckpt_path)
 
-    logger = TensorBoardLogger("lightning_logs", name="my_model")
+    logger = TensorBoardLogger(root+"lightning_logs", name="my_model")
     # strategy = DDPStrategy(find_unused_parameters=False)
     trainer = pl.Trainer(accelerator="gpu",
                          callbacks=callbacks,
@@ -124,7 +127,6 @@ def main():
     with open('config/general.json') as f:
         general_cfg = json.load(f)
 
-    print(f"tmp directory : {cfg['output_dir']}")
     # TODO: if exits remove
     # if 'experiments' in cfg.output_dir:
     #     print(f"removing tmp directory : {cfg.output_dir}")
