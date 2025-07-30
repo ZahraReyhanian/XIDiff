@@ -10,7 +10,7 @@ from visualizations.resizer import Resizer
 
 @torch.no_grad()
 def render_condition(batch, pl_module, sampler='ddim', between_zero_and_one=True, show_progress=False,
-                     generator=None, mixing_batch=None, mixing_method='label_interpolate', source_alpha=0.0,
+                     generator=None, mixing_batch=None, mixing_method='label_interpolate', source_alpha=1.0,
                      return_x0_intermediates=False):
     if generator is None:
         generator = torch.manual_seed(0)
@@ -20,7 +20,7 @@ def render_condition(batch, pl_module, sampler='ddim', between_zero_and_one=True
         if isinstance(val, torch.Tensor):
             batch[key] = val.to(pl_module.device)
 
-    encoder_hidden_states = pl_module.get_encoder_hidden_states(batch, batch_size)
+    encoder_hidden_states = pl_module.get_encoder_hidden_states(batch, batch_size, alpha=source_alpha)
     if mixing_batch is not None:
         for key, val in mixing_batch.items():
             if isinstance(val, torch.Tensor):

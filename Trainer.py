@@ -280,7 +280,7 @@ class Trainer(pl.LightningModule):
     #     norms = grad_norm(self.layer, norm_type=2)
     #     self.log_dict(norms)
 
-    def get_encoder_hidden_states(self, batch, batch_size=None):
+    def get_encoder_hidden_states(self, batch, batch_size=None, alpha=1):
         for key, val in batch.items():
             if isinstance(val, torch.Tensor):
                 batch[key] = val.to(self.device)
@@ -288,7 +288,8 @@ class Trainer(pl.LightningModule):
         encoder_hidden_states = make_condition(pl_module=self,
                                                condition_type=self.unet_config['params']['condition_type'],
                                                condition_source=self.unet_config['params']['condition_source'],
-                                               batch=batch
+                                               batch=batch,
+                                               alpha=alpha
                                                )
         if batch_size is not None and encoder_hidden_states is not None:
             for key, val in encoder_hidden_states.items():

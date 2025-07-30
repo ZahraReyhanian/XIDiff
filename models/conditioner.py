@@ -3,7 +3,7 @@ import torch
 
 
 
-def make_condition(pl_module, condition_type, condition_source, batch):
+def make_condition(pl_module, condition_type, condition_source, batch, alpha=1):
     if condition_type is None:
         return None
 
@@ -52,7 +52,7 @@ def make_condition(pl_module, condition_type, condition_source, batch):
         assert 'id_img' in batch
         id_feat, id_cross_att = pl_module.label_mapping(batch['id_img'])
         _, spatial = pl_module.recognition_model(batch['exp_img'].to(pl_module.device))
-        ext_mapping = pl_module.external_mapping(spatial)
+        ext_mapping = pl_module.external_mapping(spatial)*alpha
 
         if pl_module.attention_on_style:
             ext_mapping = pl_module.attn(ext_mapping)

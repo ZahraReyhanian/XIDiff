@@ -1,11 +1,12 @@
 import os
+import re
+import json
+import numpy as np
 import torch
+
 from Trainer import Trainer as MyModelTrainer
 from datamodules.face_datamodule import FaceDataModule
 from utils.generation_utils import generate_image
-import re
-import json
-
 from utils.os_utils import get_latest_file
 
 image_size = 112
@@ -59,6 +60,16 @@ def main():
                    save_root="generated_images",
                    batch_size=batch_size,
                    datamodule=datamodule)
+
+    # interpolation
+    # alphas = np.linspace(1, 0, 15).round(2)
+    # generate_image(pl_module=pl_module,
+    #                save_root="interpolation",
+    #                batch_size=batch_size,
+    #                datamodule=datamodule,
+    #                alphas=alphas)
+
+
 
 
 if __name__ == "__main__":
