@@ -40,7 +40,7 @@ def training(cfg, general_cfg):
     datamodule = FaceDataModule(json_path=json_path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
-    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last.ckpt'), weights_only=False)
+    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v1.ckpt'), weights_only=False)
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -58,7 +58,8 @@ def training(cfg, general_cfg):
                            sampler=general_cfg['sampler'],
                            freeze_label_mapping=True,
                            only_attention_finetuning=True,
-                           attention_on_style=False,
+                           attention_on_style=False, #TODO check
+                           random_alpha=True,
                            num_classes=cfg['num_classes'],
                            batch_size=cfg["batch_size"],
                            root=root)

@@ -3,11 +3,12 @@ import torch
 
 
 
-def make_condition(pl_module, condition_type, condition_source, batch, alpha=1):
+def make_condition(pl_module, condition_type, condition_source, batch, alpha=1, use_alpha=True):
     if condition_type is None:
         return None
 
     result = {'cross_attn': None, 'concat': None, 'add': None, 'center_emb': None}
+    alpha = torch.tensor(alpha).float().to(pl_module.device).view(-1,1,1)
 
     if condition_type == 'cross_attn' and condition_source == 'label_center':
         assert 'target_label' in batch
@@ -52,7 +53,13 @@ def make_condition(pl_module, condition_type, condition_source, batch, alpha=1):
         assert 'id_img' in batch
         id_feat, id_cross_att = pl_module.label_mapping(batch['id_img'])
         _, spatial = pl_module.recognition_model(batch['exp_img'].to(pl_module.device))
-        ext_mapping = pl_module.external_mapping(spatial)*alpha
+        ext_mapping = pl_module.external_mapping(spatial)
+
+        if use_alpha:
+            _, spatial2 = pl_module.recognition_model(batch['id_img'].to(pl_module.device))
+            ext_mapping2 = pl_module.external_mapping(spatial2)
+
+            ext_mapping = ext_mapping*alpha + ext_mapping2*(1-alpha)
 
         if pl_module.attention_on_style:
             ext_mapping = pl_module.attn(ext_mapping)

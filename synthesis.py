@@ -50,24 +50,25 @@ def main():
     print("loading dataset ........")
 
     json_path = os.path.join(root, cfg["json_path"])
-    batch_size = 1
+    batch_size = 4 #4 for interpolation 1 for generation
     datamodule = FaceDataModule(json_path=json_path,
                                 img_size=(image_size, image_size),
                                 batch_size=batch_size)
     datamodule.setup()
 
-    generate_image(pl_module=pl_module,
-                   save_root="generated_images",
-                   batch_size=batch_size,
-                   datamodule=datamodule)
-
-    # interpolation
-    # alphas = np.linspace(1, 0, 15).round(2)
     # generate_image(pl_module=pl_module,
-    #                save_root="interpolation",
+    #                save_root="generated_images",
     #                batch_size=batch_size,
     #                datamodule=datamodule,
-    #                alphas=alphas)
+    #                total_images=200)
+
+    # interpolation
+    alphas = np.linspace(1, 0, 10).round(2)
+    generate_image(pl_module=pl_module,
+                   save_root="interpolation",
+                   batch_size=batch_size,
+                   datamodule=datamodule,
+                   alphas=alphas)
 
 
 

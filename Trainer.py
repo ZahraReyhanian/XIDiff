@@ -55,6 +55,7 @@ class Trainer(pl.LightningModule):
                  attention_on_style=True,
                  num_classes=6,
                  batch_size=16,
+                 random_alpha=True,
                  root='',
                  *args, **kwargs
                  ):
@@ -86,6 +87,7 @@ class Trainer(pl.LightningModule):
         self.only_attention_finetuning = only_attention_finetuning
         self.attention_on_style = attention_on_style
         self.batch_size = batch_size
+        self.random_alpha = random_alpha
 
         recognition['ckpt_path'] = os.path.join(root, recognition['ckpt_path'])
         recognition['center_path'] = os.path.join(root, recognition['center_path'])
@@ -214,10 +216,13 @@ class Trainer(pl.LightningModule):
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx=0):
         pass
 
-    def shared_step(self, batch, stage='train', optimizer_idx=0, *args, **kwargs):
+    def shared_step(self, batch, stage='train', optimizer_idx=0, random_alpha=True, *args, **kwargs):
         clean_images = batch["exp_img"]
 
         bsz = clean_images.shape[0]
+        alpha = torch.ones(bsz, 1).to(self.device)
+        if random_alpha:
+            alpha = 1-torch.rand(bsz, 1).to(self.device)
         noise = torch.randn(clean_images.shape).to(self.device)
 
         # Sample a random timestep for each image
@@ -230,7 +235,7 @@ class Trainer(pl.LightningModule):
         # arcface_loss = ArcFace(embed_size=self.embed_size, num_classes=self.num_classes).to(self.device)
         if optimizer_idx == 0:
             noisy_images = self.noise_scheduler.add_noise(clean_images, noise, timesteps)
-            encoder_hidden_states = self.get_encoder_hidden_states(batch, batch_size=None)
+            encoder_hidden_states = self.get_encoder_hidden_states(batch, batch_size=None, alpha=alpha)
             noise_pred = self.model(noisy_images, timesteps, encoder_hidden_states=encoder_hidden_states).sample
             mse_loss = F.mse_loss(noise_pred, noise)
 
@@ -253,12 +258,16 @@ class Trainer(pl.LightningModule):
                 loss_dict[f'{stage}/id_loss'] = id_loss
 
             if self.perceptual_loss_lambda > 0:
+                target_pixels = batch["exp_img"]
+                if random_alpha:
+                    alpha = alpha.view(-1,1,1,1)
+                    target_pixels = alpha*batch["exp_img"] + (1-alpha)*batch["id_img"]
                 perc_loss = perceptual_loss(self.perceptual_loss_weight,
                                             eps=noise_pred,
                                             timesteps=timesteps,
                                             noisy_images=noisy_images,
                                             pl_module=self,
-                                            target_pixels=batch["exp_img"])
+                                            target_pixels=target_pixels)
                 total_loss = total_loss + perc_loss*self.perceptual_loss_lambda
                 loss_dict[f'{stage}/perc_loss'] = perc_loss
 
@@ -289,7 +298,8 @@ class Trainer(pl.LightningModule):
                                                condition_type=self.unet_config['params']['condition_type'],
                                                condition_source=self.unet_config['params']['condition_source'],
                                                batch=batch,
-                                               alpha=alpha
+                                               alpha=alpha,
+                                               use_alpha=self.random_alpha
                                                )
         if batch_size is not None and encoder_hidden_states is not None:
             for key, val in encoder_hidden_states.items():
@@ -302,7 +312,7 @@ class Trainer(pl.LightningModule):
         raise ValueError('should not be here. Not Implemented')
 
     def training_step(self, batch, batch_idx):
-        loss, loss_dict = self.shared_step(batch, stage='train')
+        loss, loss_dict = self.shared_step(batch, stage='train', random_alpha=self.random_alpha)
         if self.ema_model.averaged_model.device != self.device:
             self.ema_model.averaged_model.to(self.device)
         self.ema_model.step(self.model)
