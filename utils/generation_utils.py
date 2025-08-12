@@ -8,38 +8,64 @@ from torchvision.utils import make_grid
 import torchvision
 from utils import sample_visual
 from torchvision import transforms
-from utils.interpolation_utils import prepare_text_img
+# from utils.interpolation_utils import prepare_text_img
+from utils.evaluation import *
+
+
+def save_images(it, image, original_image, target_image, target_label, save_root):
+    save_name = f"img_{it}.jpg"
+    # save image
+    save_path = os.path.join(save_root, save_name)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    cv2.imwrite(save_path, image)
+
+    save_path = os.path.join(save_root + '/exp', f"img_{it}_{target_label}-exp.jpg")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    target_image.save(save_path)
+
+    save_path = os.path.join(save_root + '/id', f"img_{it}-id.jpg")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    original_image.save(save_path)
 
 
 def plot_generated_image(dataloader, pl_module, seed, save_root, total_images):
     it = 0
+
+    psnr = []
+    ssim = []
+    id_cs = []
+    lpips = []
     for batch in tqdm(dataloader, total=len(dataloader), desc='Generating Images: '):
-        print('target_label:', batch['target_label'])
+        new_size = (112,112)
+        original_image = Image.open(batch['src_path'][0]).convert("RGB").resize(new_size)
+        target_image = Image.open(batch['target_path'][0]).convert("RGB").resize(new_size)
 
-        original_image = Image.open(batch['src_path'][0]).convert("RGB")
-        target_image = Image.open(batch['target_path'][0]).convert("RGB")
+        image = sample_batch(batch, pl_module, seed=seed)[0]
+        save_images(it, image, original_image, target_image, batch['target_label'][0].item(), save_root)
 
-        plotting_images = sample_batch(batch, pl_module, seed=seed)
+        original_image = np.array(original_image)
+        target_image = np.array(target_image)
 
-        for i, image in enumerate(plotting_images):
-            save_name = f"img_{i}_{it}.jpg"
-            # save image
-            save_path = os.path.join(save_root, save_name)
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            cv2.imwrite(save_path, image)
+        psnr.append(compute_PSNR(original_image, image))
+        ssim.append(compute_SSIM(original_image, image))
+        id_cs.append(compute_id_cosine_similarity(original_image, image, pl_module))
+        lpips.append(compute_lpips(target_image, image))
 
-            save_path = os.path.join(save_root, f"img_{i}_{it}_{batch['target_label'].item()}-exp.jpg")
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            target_image.save(save_path)
 
-            save_path = os.path.join(save_root, f"img_{i}_{it}-id.jpg")
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            original_image.save(save_path)
-
-            it += 1
+        it += 1
 
         if it > total_images:
             break
+
+    print("PSNR: ", psnr)
+    print("SSIM: ", ssim)
+    print("ID Cosine Similarity: ", id_cs)
+    print("LPIPS: ", lpips)
+
+    print("PSNR: ", np.array(psnr).mean())
+    print("SSIM: ", np.array(ssim).mean())
+    print("ID Cosine Similarity: ", np.array(id_cs).mean())
+    print("LPIPS: ", np.array(lpips).mean())
 
 
 def plot_expr_interpolation(dataloader, alphas, pl_module, seed, save_root):
@@ -113,7 +139,7 @@ def sample_batch(batch, pl_module, seed=None):
                                    return_x0_intermediates=False)
 
     # select which time to plot
-    plotting_images = pred_images * 255
+    plotting_images = np.clip(pred_images * 255, 0, 255)
     return plotting_images[:, :, :, ::-1]
 
 

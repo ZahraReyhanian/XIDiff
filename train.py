@@ -59,7 +59,7 @@ def training(cfg, general_cfg):
                            freeze_label_mapping=True,
                            only_attention_finetuning=True,
                            attention_on_style=False, #TODO check
-                           random_alpha=True,
+                           random_alpha=False,
                            num_classes=cfg['num_classes'],
                            batch_size=cfg["batch_size"],
                            root=root)

@@ -23,22 +23,15 @@ def main():
 
     root = cfg['root']
 
-    ## config from dcface
-    # ckpt = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'))
-    # print(ckpt['state_dict'])
-    # model_hparam = ckpt['hyper_parameters']
-    # model_hparam['unet_config']['params']['pretrained_model_path'] = None
-    # model_hparam['_target_'] = 'src.trainer.Trainer'
-    # model_hparam['_partial_'] = True
-
     # load pl_module
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
     # get checkpoint path
     model_ckpt_path = root + cfg["ckpt_path"]
-    name = get_latest_file(model_ckpt_path)
-    print(name)
+    # name = get_latest_file(model_ckpt_path)
+    # print(name)
+    name = 'last-v4.ckpt'
     checkpoint_path = os.path.join(model_ckpt_path, name)
     print("loading from: ", checkpoint_path)
 
@@ -60,10 +53,10 @@ def main():
     #                save_root="generated_images",
     #                batch_size=batch_size,
     #                datamodule=datamodule,
-    #                total_images=200)
+    #                total_images=800)
 
     # interpolation
-    alphas = np.linspace(1, 0, 10).round(2)
+    alphas = np.linspace(1, 0, 11).round(2)
     generate_image(pl_module=pl_module,
                    save_root="interpolation",
                    batch_size=batch_size,
