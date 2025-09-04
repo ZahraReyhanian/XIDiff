@@ -40,7 +40,8 @@ def training(cfg, general_cfg):
     datamodule = FaceDataModule(json_path=json_path, img_size=(cfg["image_size"], cfg["image_size"]),
                                 batch_size=cfg["batch_size"])
 
-    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v1.ckpt'), weights_only=False)
+    # modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'), weights_only=False)
+    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v8.ckpt'), weights_only=False)
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -52,13 +53,13 @@ def training(cfg, general_cfg):
                            output_dir=cfg["output_dir"],
                            mse_loss_lambda=0, #cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=0, #cfg["identity_consistency_loss_lambda"],
-                           arcface_loss_lambda=0, #cfg['arcface_loss_lambda'],
-                           perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
+                           arcface_loss_lambda=0,
+                           perceptual_loss_lambda=0.05, #cfg['perceptual_loss_lambda'],
                            perceptual_loss_weight=cfg['perceptual_loss_weight'],
                            sampler=general_cfg['sampler'],
                            freeze_label_mapping=True,
                            only_attention_finetuning=True,
-                           attention_on_style=False, #TODO check
+                           attention_on_style=False,
                            random_alpha=False,
                            num_classes=cfg['num_classes'],
                            batch_size=cfg["batch_size"],
@@ -128,10 +129,6 @@ def main():
     with open('config/general.json') as f:
         general_cfg = json.load(f)
 
-    # TODO: if exits remove
-    # if 'experiments' in cfg.output_dir:
-    #     print(f"removing tmp directory : {cfg.output_dir}")
-    #     shutil.rmtree(cfg.paths.output_dir, ignore_errors=True)
     run_name = os_utils.make_runname(cfg["prefix"])
     task = os.path.basename(cfg["project"])
     exp_root = os.path.dirname(cfg["output_dir"])

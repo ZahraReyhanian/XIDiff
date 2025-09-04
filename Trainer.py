@@ -52,7 +52,7 @@ class Trainer(pl.LightningModule):
                  perceptual_loss_weight=[],
                  freeze_label_mapping=False,
                  only_attention_finetuning=True,
-                 attention_on_style=True,
+                 attention_on_style=False,
                  num_classes=6,
                  batch_size=16,
                  random_alpha=True,
@@ -238,6 +238,7 @@ class Trainer(pl.LightningModule):
             encoder_hidden_states = self.get_encoder_hidden_states(batch, batch_size=None, alpha=alpha)
             noise_pred = self.model(noisy_images, timesteps, encoder_hidden_states=encoder_hidden_states).sample
             mse_loss = F.mse_loss(noise_pred, noise)
+            # l1_loss = F.l1_loss(noise_pred, noise)
 
             total_loss = total_loss + mse_loss * self.mse_loss_lambda
             loss_dict[f'{stage}/mse_loss'] = mse_loss

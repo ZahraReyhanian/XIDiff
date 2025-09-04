@@ -1,15 +1,46 @@
 import os
 import json
+import random
 
-def collect_pairs_from_split(split_dir):
+def get_random_target_emotion_file(folder_path):
+    """
+    Selects a random JPG file from the specified folder.
+
+    Args:
+        folder_path (str): The path to the folder containing JPG files.
+
+    Returns:
+        str: The full path to a randomly selected JPG file, or None if no JPG files are found.
+    """
+    jpg_files = []
+    try:
+        for entry in os.listdir(folder_path):
+            full_path = os.path.join(folder_path, entry)
+            if os.path.isfile(full_path) and entry.lower().endswith(".jpg"):
+                jpg_files.append(full_path)
+
+        if jpg_files:
+            return random.choice(jpg_files)
+        else:
+            print(f"No JPG files found in '{folder_path}'")
+            return None
+    except FileNotFoundError:
+        print(f"Error: Folder '{folder_path}' not found.")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+def collect_pairs_from_split(root, split):
+    dataset_path = os.path.join(root, split)
     all_pairs = []
-    if 'train' in split_dir:
+    if split == 'train':
         num_neutral_imgs = 2
     else:
         num_neutral_imgs = 10
 
-    for person in os.listdir(split_dir):
-        person_path = os.path.join(split_dir, person)
+    for person in os.listdir(dataset_path):
+        person_path = os.path.join(dataset_path, person)
         if not os.path.isdir(person_path):
             continue
 
@@ -37,7 +68,16 @@ def collect_pairs_from_split(split_dir):
 
             for n_img in neutral_imgs[:num_neutral_imgs]:
                 for e_img in emotion_imgs:
-                    all_pairs.append([n_img, e_img, emotion])
+                    if split == 'train':
+                        all_pairs.append([n_img, e_img, emotion])
+                    else:
+                        id_name = os.path.basename(n_img).replace('.jpg', '')
+                        train_path = os.path.join(root, 'train')
+                        id_path = os.path.join(train_path, id_name)
+                        id_exp_dir = os.path.join(str(id_path), str(emotion))
+                        target = get_random_target_emotion_file(id_exp_dir)
+
+                        all_pairs.append([n_img, e_img, emotion, target])
 
     return all_pairs
 
@@ -55,8 +95,7 @@ print('saved path: ', json_path)
 os.makedirs(json_path, exist_ok=True)
 
 for split in splits:
-    split_path = os.path.join(dataset_root, split)
-    pairs = collect_pairs_from_split(split_path)
+    pairs = collect_pairs_from_split(root=dataset_root, split=split)
 
     with open(f'{json_path}/{split}.json', 'w') as f:
         json.dump(pairs, f, indent=2)

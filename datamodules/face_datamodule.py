@@ -9,7 +9,7 @@ class FaceDataModule(LightningDataModule):
     def __init__(
             self,
             json_path,
-            img_size=(48, 48),
+            img_size=(112, 112),
             seed=42,
             batch_size=32,
             num_workers=8,
@@ -44,14 +44,17 @@ class FaceDataModule(LightningDataModule):
         if not self.data_train and not self.data_val and not self.data_test:
             self.data_train = WrapperDataset(
                 json_path=f"{self.json_path}/train.json",
+                stage='train',
                 transform=self.transform
             )
             self.data_val = WrapperDataset(
                 json_path=f"{self.json_path}/valid.json",
+                stage='valid',
                 transform=self.transform
             )
             self.data_test = WrapperDataset(
                 json_path=f"{self.json_path}/test.json",
+                stage='test',
                 transform=self.transform,
                 shuffle=self.shuffle,
                 seed=self.seed

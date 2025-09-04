@@ -8,11 +8,10 @@ from torchvision.utils import make_grid
 import torchvision
 from utils import sample_visual
 from torchvision import transforms
-# from utils.interpolation_utils import prepare_text_img
 from utils.evaluation import *
 
 
-def save_images(it, image, original_image, target_image, target_label, save_root):
+def save_images(it, image, id_image, target_image, exp_image, target_label, save_root):
     save_name = f"img_{it}.jpg"
     # save image
     save_path = os.path.join(save_root, save_name)
@@ -21,46 +20,50 @@ def save_images(it, image, original_image, target_image, target_label, save_root
 
     save_path = os.path.join(save_root + '/exp', f"img_{it}_{target_label}-exp.jpg")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    exp_image.save(save_path)
+
+    save_path = os.path.join(save_root + '/target', f"img_{it}_target.jpg")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     target_image.save(save_path)
 
     save_path = os.path.join(save_root + '/id', f"img_{it}-id.jpg")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    original_image.save(save_path)
+    id_image.save(save_path)
 
 
 def plot_generated_image(dataloader, pl_module, seed, save_root, total_images):
     it = 0
+    new_size = (112, 112)
 
     psnr = []
     ssim = []
     id_cs = []
     lpips = []
     for batch in tqdm(dataloader, total=len(dataloader), desc='Generating Images: '):
-        new_size = (112,112)
-        original_image = Image.open(batch['src_path'][0]).convert("RGB").resize(new_size)
+        id_image = Image.open(batch['id_path'][0]).convert("RGB").resize(new_size)
         target_image = Image.open(batch['target_path'][0]).convert("RGB").resize(new_size)
+        exp_image = Image.open(batch['exp_path'][0]).convert("RGB").resize(new_size)
+        target_label = batch['target_label'][0].item()
 
         image = sample_batch(batch, pl_module, seed=seed)[0]
-        save_images(it, image, original_image, target_image, batch['target_label'][0].item(), save_root)
+        save_images(it, image, id_image, target_image, exp_image, target_label, save_root)
 
-        original_image = np.array(original_image)
+        cs = compute_id_cosine_similarity(target_image, Image.fromarray(np.uint8(image)), pl_module)
+        id_cs.append(cs)
+        print(cs)
+        lpips.append(compute_lpips(target_image, Image.fromarray(np.uint8(image))))
+
         target_image = np.array(target_image)
 
-        psnr.append(compute_PSNR(original_image, image))
-        ssim.append(compute_SSIM(original_image, image))
-        id_cs.append(compute_id_cosine_similarity(original_image, image, pl_module))
-        lpips.append(compute_lpips(target_image, image))
+        psnr.append(compute_PSNR(target_image, image))
+        ssim.append(compute_SSIM(target_image, image))
+
 
 
         it += 1
 
         if it > total_images:
             break
-
-    print("PSNR: ", psnr)
-    print("SSIM: ", ssim)
-    print("ID Cosine Similarity: ", id_cs)
-    print("LPIPS: ", lpips)
 
     print("PSNR: ", np.array(psnr).mean())
     print("SSIM: ", np.array(ssim).mean())
@@ -79,7 +82,7 @@ def plot_expr_interpolation(dataloader, alphas, pl_module, seed, save_root):
     for batch in tqdm(dataloader, total=len(dataloader), desc='Generating Images: '):
         vis = []
 
-        for id_img, exp_img, target_label, src_path, target_path in zip(batch['id_img'], batch['exp_img'], batch['target_label'], batch['src_path'], batch['target_path']):
+        for id_img, exp_img, target_label, id_path, exp_path in zip(batch['id_img'], batch['exp_img'], batch['target_label'], batch['id_path'], batch['exp_path']):
             batch_data = {'id_img': id_img.unsqueeze(0), 'exp_img': exp_img.unsqueeze(0), 'target_label': target_label.unsqueeze(0)}
 
             sub_pred_image = []
@@ -94,14 +97,14 @@ def plot_expr_interpolation(dataloader, alphas, pl_module, seed, save_root):
 
             sub_pred_image = torch.tensor(np.array(sub_pred_image))
 
-            original_image = Image.open(src_path).convert("RGB")
-            target_image = Image.open(target_path).convert("RGB")
+            id_image = Image.open(id_path).convert("RGB")
+            target_image = Image.open(exp_path).convert("RGB")
             transform = transforms.Compose([transforms.Resize((112,112)),
                                             transforms.ToTensor()])
-            original_image = transform(original_image)
+            id_image = transform(id_image)
             target_image = transform(target_image)
 
-            row_images = np.concatenate((original_image.unsqueeze(0),
+            row_images = np.concatenate((id_image.unsqueeze(0),
                                          target_image.unsqueeze(0),
                                          sub_pred_image.permute(0, 3, 1, 2)), axis=0)
 

@@ -4,6 +4,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+"""
+This code is from this link: https://github.com/GOKORURI007/pytorch_arcface/blob/main/arcface.py
+"""
 
 class ArcFace(nn.Module):
     def __init__(self, embed_size, num_classes, scale=64, margin=0.5, easy_margin=False, **kwargs):
