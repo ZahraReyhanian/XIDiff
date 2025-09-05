@@ -41,7 +41,7 @@ def training(cfg, general_cfg):
                                 batch_size=cfg["batch_size"])
 
     # modelTrainer_path = torch.load(os.path.join(root, 'pretrained_models/dcface_3x3.ckpt'), weights_only=False)
-    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v8.ckpt'), weights_only=False)
+    modelTrainer_path = torch.load(os.path.join(root, 'checkpoints/last-v10.ckpt'), weights_only=False)
 
     model = MyModelTrainer(unet_config=general_cfg['unet_config'],
                            use_pretrained=use_pretrained,
@@ -54,13 +54,13 @@ def training(cfg, general_cfg):
                            mse_loss_lambda=0, #cfg["mse_loss_lambda"],
                            identity_consistency_loss_lambda=0, #cfg["identity_consistency_loss_lambda"],
                            arcface_loss_lambda=0,
-                           perceptual_loss_lambda=0.05, #cfg['perceptual_loss_lambda'],
+                           perceptual_loss_lambda=cfg['perceptual_loss_lambda'],
                            perceptual_loss_weight=cfg['perceptual_loss_weight'],
                            sampler=general_cfg['sampler'],
                            freeze_label_mapping=True,
                            only_attention_finetuning=True,
                            attention_on_style=False,
-                           random_alpha=False,
+                           random_alpha=True,
                            num_classes=cfg['num_classes'],
                            batch_size=cfg["batch_size"],
                            root=root)
