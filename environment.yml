@@ -77,8 +77,6 @@ dependencies:
   - ncurses=6.5=h7934f7d_0
   - nettle=3.7.3=hbbd107a_1
   - networkx=3.2.1=py39h06a4308_0
-  - numpy=1.26.0=py39h5f9d8c6_0
-  - numpy-base=1.26.0=py39hb5e798b_0
   - openh264=2.1.1=h4ff587b_0
   - openjpeg=2.5.2=h0d4d230_1
   - openssl=3.0.17=h5eee18b_0
@@ -150,6 +148,7 @@ dependencies:
       - markdown==3.8.2
       - matplotlib==3.9.4
       - multidict==6.6.4
+      - numpy==1.26.3
       - nvidia-cublas-cu12==12.4.5.8
       - nvidia-cuda-cupti-cu12==12.4.127
       - nvidia-cuda-nvrtc-cu12==12.4.127
@@ -163,6 +162,7 @@ dependencies:
       - nvidia-nvjitlink-cu12==12.4.127
       - nvidia-nvtx-cu12==12.4.127
       - omegaconf==2.3.0
+      - opencv-python==4.12.0.88
       - packaging==25.0
       - pandas==2.2.3
       - pillow==10.2.0
