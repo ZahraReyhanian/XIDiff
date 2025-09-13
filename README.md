@@ -19,3 +19,5 @@ We recommend running this repository using [Anaconda](https://docs.anaconda.com/
 ```
 conda env create -f environment.yml
 ```
+### Train and inference
+- to be released soon
